@@ -203,27 +203,23 @@ class MovieAiTranslator:
 """
         return recap_template
 
-    def download_khmer_audio(self, text, output_path):
-        """Download native Khmer TTS audio clip (.mp3)."""
-        if not text.strip():
+    def download_khmer_audio(self, text, output_path, voice="piseth"):
+        """Download native Khmer neural TTS audio clip (.mp3) using edge-tts."""
+        clean = text.strip()
+        if not clean:
             return False
         try:
-            url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=km&client=tw-ob&q={urllib.parse.quote(text)}"
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "Referer": "https://translate.google.com/"
-                }
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = resp.read()
-                os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-                with open(output_path, "wb") as f:
-                    f.write(data)
+            import asyncio
+            import edge_tts
+            voice_name = "km-KH-SreymomNeural" if str(voice).lower() in ["sreymom", "female"] else "km-KH-PisethNeural"
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            async def _run():
+                communicate = edge_tts.Communicate(clean, voice_name)
+                await communicate.save(output_path)
+            asyncio.run(_run())
             return True
         except Exception as e:
-            print(f"[Audio Error] Could not download audio for '{text[:20]}...': {e}", file=sys.stderr)
+            print(f"[Audio Error] Could not generate Khmer speech for '{clean[:20]}...': {e}", file=sys.stderr)
             return False
 
 def main():
@@ -235,6 +231,7 @@ def main():
     parser.add_argument("--plot", help="Path to movie plot file to generate Khmer recap script")
     parser.add_argument("--recap", action="store_true", help="Generate viral movie recap script")
     parser.add_argument("--audio", action="store_true", help="Generate and download synchronized Khmer MP3 audio dubbing clips")
+    parser.add_argument("--voice", default="piseth", choices=["piseth", "sreymom"], help="Khmer voice: piseth (Male) or sreymom (Female)")
     parser.add_argument("--key", help="Google Gemini API key (optional, uses free engine if omitted)")
 
     args = parser.parse_args()
@@ -255,8 +252,8 @@ def main():
 
         if args.audio:
             audio_out = (os.path.splitext(args.output)[0] + "_narration.mp3") if args.output else "recap_narration.mp3"
-            print(f"[*] Downloading Khmer narration audio to {audio_out}...")
-            translator.download_khmer_audio(script[:300], audio_out)
+            print(f"[*] Generating native Khmer narration audio ({args.voice}) to {audio_out}...")
+            translator.download_khmer_audio(script[:300], audio_out, voice=args.voice)
             print(f"[✔] Audio narration clip saved to: {audio_out}")
         return
 
@@ -270,9 +267,9 @@ def main():
         audio_dir = None
         if args.audio:
             base = os.path.splitext(args.output or args.input)[0]
-            audio_dir = base + "_audio_dub"
+            audio_dir = base + f"_audio_dub_{args.voice}"
             os.makedirs(audio_dir, exist_ok=True)
-            print(f"[*] Audio Dubbing enabled! Saving MP3s to: {audio_dir}/")
+            print(f"[*] Audio Dubbing enabled ({args.voice})! Saving MP3s to: {audio_dir}/")
 
         for idx, sub in enumerate(subs, 1):
             orig = sub["text"]
@@ -283,7 +280,7 @@ def main():
 
             if args.audio and translated:
                 mp3_path = os.path.join(audio_dir, f"cue_{idx:03d}_khmer.mp3")
-                translator.download_khmer_audio(translated, mp3_path)
+                translator.download_khmer_audio(translated, mp3_path, voice=args.voice)
 
             time.sleep(0.15)
 

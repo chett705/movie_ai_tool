@@ -1,10 +1,16 @@
 const http = require("http");
-const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { execFile } = require("child_process");
+const crypto = require("crypto");
 
 const PORT = process.env.PORT || 3000;
 const BASE_DIR = __dirname;
+const CACHE_DIR = path.join(BASE_DIR, "cache_audio");
+
+if (!fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -37,34 +43,59 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API Endpoint: Native Khmer Audio TTS Streaming Proxy
+  // API Endpoint: Native Khmer Neural Text-To-Speech (TTS)
+  // Supports: /api/tts?text=...&voice=piseth|sreymom
   if (reqPath === "/api/tts") {
     const urlObj = new URL(req.url, `http://${req.headers.host || "localhost:3000"}`);
     const text = urlObj.searchParams.get("text");
+    const voice = urlObj.searchParams.get("voice") || "piseth";
+
     if (!text || !text.trim()) {
       res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("Missing text parameter");
       return;
     }
 
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=km&client=tw-ob&q=${encodeURIComponent(text.trim())}`;
-    
-    https.get(ttsUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://translate.google.com/"
-      }
-    }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 200, {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "public, max-age=86400",
-        "Access-Control-Allow-Origin": "*"
+    const cleanText = text.trim();
+    // Generate deterministic hash for audio caching
+    const hash = crypto.createHash("md5").update(`${voice}_${cleanText}`).digest("hex");
+    const cachedFilePath = path.join(CACHE_DIR, `${hash}.mp3`);
+
+    // Helper to stream MP3 file back to client
+    const streamAudio = (filePath) => {
+      fs.stat(filePath, (err, stats) => {
+        if (err || !stats.isFile() || stats.size === 0) {
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Audio file corrupted or empty");
+          return;
+        }
+
+        res.writeHead(200, {
+          "Content-Type": "audio/mpeg",
+          "Content-Length": stats.size,
+          "Cache-Control": "public, max-age=604800",
+          "Access-Control-Allow-Origin": "*"
+        });
+        fs.createReadStream(filePath).pipe(res);
       });
-      proxyRes.pipe(res);
-    }).on("error", (err) => {
-      console.error("[TTS Error]:", err.message);
-      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("TTS Proxy Error: " + err.message);
+    };
+
+    // If already generated and cached, stream immediately
+    if (fs.existsSync(cachedFilePath) && fs.statSync(cachedFilePath).size > 0) {
+      streamAudio(cachedFilePath);
+      return;
+    }
+
+    // Otherwise, generate audio using native Khmer Neural engine (tts_helper.py)
+    const helperScript = path.join(BASE_DIR, "tts_helper.py");
+    execFile("python", [helperScript, cleanText, cachedFilePath, voice], { timeout: 25000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error("[TTS Generation Error]:", error, stderr);
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("TTS Generation Error: " + (stderr || error.message));
+        return;
+      }
+      streamAudio(cachedFilePath);
     });
     return;
   }
@@ -104,6 +135,8 @@ server.listen(PORT, () => {
   console.log(`\n======================================================`);
   console.log(`🎬 CineKhmer AI Studio running at:`);
   console.log(`👉 http://localhost:${PORT}`);
-  console.log(`🎙️ Native Khmer TTS Audio API: http://localhost:${PORT}/api/tts?text=សួស្តី`);
+  console.log(`🎙️ Native Neural Khmer TTS API:`);
+  console.log(`   - Male (Piseth):  http://localhost:${PORT}/api/tts?text=សួស្តី&voice=piseth`);
+  console.log(`   - Female (Sreymom): http://localhost:${PORT}/api/tts?text=សួស្តី&voice=sreymom`);
   console.log(`======================================================\n`);
 });

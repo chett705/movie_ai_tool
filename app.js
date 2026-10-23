@@ -147,7 +147,8 @@ const elements = {
   toggleKhmerDubbing: document.getElementById("toggle-khmer-dubbing"),
   dubbingLiveBadge: document.getElementById("dubbing-live-badge"),
   dubbingBadgeText: document.getElementById("dubbing-badge-text"),
-  selectTtsEngine: document.getElementById("select-tts-engine"),
+  selectVideoVoice: document.getElementById("select-video-voice"),
+  selectRecapVoice: document.getElementById("select-recap-voice"),
   videoDuckingSlider: document.getElementById("video-ducking-slider"),
   duckingValDisplay: document.getElementById("ducking-val-display"),
   dubbingVolumeSlider: document.getElementById("dubbing-volume-slider"),
@@ -684,43 +685,55 @@ function renderRecapScript(text) {
 }
 
 // ==========================================
-// Text-To-Speech (TTS) Voiceover
+// Native Khmer Neural Text-To-Speech (TTS) Engine
 // ==========================================
-function speakKhmerText(text) {
-  if (!("speechSynthesis" in window)) {
-    alert("Browser របស់អ្នកមិនទាន់គាំទ្រ Speech Synthesis API ទេ។");
-    return;
+function speakKhmerText(text, voice = "piseth") {
+  const clean = text.replace(/\[.*?\]/g, "").replace(/【.*?】/g, "").replace(/🎬|⚡|🔥|🌟|🎙️/g, "").trim();
+  if (!clean) return;
+
+  // Stop previous speech
+  if (state.currentPlayingAudio) {
+    state.currentPlayingAudio.pause();
+    state.currentPlayingAudio = null;
   }
 
-  window.speechSynthesis.cancel();
+  const selectedVoice = voice || elements.selectRecapVoice?.value || "piseth";
+  const audioUrl = `/api/tts?text=${encodeURIComponent(clean)}&voice=${encodeURIComponent(selectedVoice)}`;
+  const audio = new Audio(audioUrl);
+  state.currentPlayingAudio = audio;
 
-  // Clean script formatting markers
-  const clean = text.replace(/\[.*?\]/g, "").replace(/【.*?】/g, "").replace(/🎬|⚡|🔥|🌟|🎙️/g, "").trim();
-
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.rate = state.ttsSpeed;
-  utterance.pitch = 1.0;
-
-  // Search for Khmer voice or suitable Asian/universal voice
-  const voices = window.speechSynthesis.getVoices();
-  const kmVoice = voices.find(v => v.lang.startsWith("km")) || voices.find(v => v.lang.startsWith("th")) || voices[0];
-  if (kmVoice) utterance.voice = kmVoice;
-
-  utterance.onstart = () => {
-    state.isPlayingAudio = true;
-    elements.audioWaves?.classList.add("playing");
-    elements.audioStatus.textContent = "កំពុងអានសាកល្បង...";
+  state.isPlayingAudio = true;
+  elements.audioWaves?.classList.add("playing");
+  if (elements.audioStatus) {
+    elements.audioStatus.textContent = `កំពុងអានដោយ ${selectedVoice === "sreymom" ? "អ្នកនាង ស្រីមុំ" : "លោក ពិសិដ្ឋ"}...`;
+  }
+  if (elements.btnTtsToggle) {
     elements.btnTtsToggle.innerHTML = `<i class="fa-solid fa-pause"></i>`;
-  };
+  }
 
-  utterance.onend = utterance.onerror = () => {
+  audio.onended = () => {
     state.isPlayingAudio = false;
     elements.audioWaves?.classList.remove("playing");
-    elements.audioStatus.textContent = "ការអានត្រូវបានបញ្ចប់";
-    elements.btnTtsToggle.innerHTML = `<i class="fa-solid fa-play"></i>`;
+    if (elements.audioStatus) elements.audioStatus.textContent = "ការអានត្រូវបានបញ្ចប់";
+    if (elements.btnTtsToggle) elements.btnTtsToggle.innerHTML = `<i class="fa-solid fa-play"></i>`;
+    state.currentPlayingAudio = null;
   };
 
-  window.speechSynthesis.speak(utterance);
+  audio.onerror = (e) => {
+    console.error("Native Khmer TTS Error:", e);
+    state.isPlayingAudio = false;
+    elements.audioWaves?.classList.remove("playing");
+    if (elements.audioStatus) elements.audioStatus.textContent = "កំហុសក្នុងការទាញយកសំឡេង";
+    if (elements.btnTtsToggle) elements.btnTtsToggle.innerHTML = `<i class="fa-solid fa-play"></i>`;
+    state.currentPlayingAudio = null;
+  };
+
+  audio.play().catch(err => {
+    console.warn("Audio playback error:", err);
+    state.isPlayingAudio = false;
+    elements.audioWaves?.classList.remove("playing");
+    if (elements.btnTtsToggle) elements.btnTtsToggle.innerHTML = `<i class="fa-solid fa-play"></i>`;
+  });
 }
 
 // ==========================================
@@ -980,14 +993,14 @@ function playKhmerDubbingCue(cue) {
   if (!text) return;
 
   const video = elements.cinemaVideo;
-  const engine = elements.selectTtsEngine ? elements.selectTtsEngine.value : "neural";
+  const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
   const duckingLevel = state.videoDuckingLevel;
   const dubbingVolume = state.dubbingVolume;
 
   // Show live dubbing HUD badge on video
   if (elements.dubbingLiveBadge) {
     elements.dubbingLiveBadge.classList.remove("hidden");
-    elements.dubbingBadgeText.textContent = `AI កំពុងនិយាយ (#${cue.index}): "${text.slice(0, 25)}..."`;
+    elements.dubbingBadgeText.textContent = `AI ${voice === "sreymom" ? "ស្រីមុំ" : "ពិសិដ្ឋ"} កំពុងនិយាយ (#${cue.index})`;
   }
 
   // Smooth Audio Ducking: Lower original movie volume
@@ -1002,9 +1015,6 @@ function playKhmerDubbingCue(cue) {
     state.currentPlayingAudio.currentTime = 0;
     state.currentPlayingAudio = null;
   }
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
 
   function onSpeechEnd() {
     // Restore video volume
@@ -1016,64 +1026,43 @@ function playKhmerDubbingCue(cue) {
     state.currentPlayingAudio = null;
   }
 
-  if (engine === "neural") {
-    // Play native Google Khmer TTS audio from local /api/tts endpoint
-    let audio = state.audioCache.get(cue.index);
-    if (!audio) {
-      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}`;
-      audio = new Audio(audioUrl);
-      state.audioCache.set(cue.index, audio);
-    }
-    audio.volume = dubbingVolume;
-    audio.currentTime = 0;
-    state.currentPlayingAudio = audio;
-
-    audio.onended = onSpeechEnd;
-    audio.onerror = () => {
-      // Fallback to speech synthesis if network fails
-      speakKhmerTextWithCallback(text, onSpeechEnd);
-    };
-
-    audio.play().catch(err => {
-      console.warn("Audio play issue, falling back to Web Speech:", err);
-      speakKhmerTextWithCallback(text, onSpeechEnd);
-    });
-  } else {
-    speakKhmerTextWithCallback(text, onSpeechEnd);
+  // Play native Khmer Neural voice from local /api/tts endpoint
+  const cacheKey = `${voice}_${cue.index}`;
+  let audio = state.audioCache.get(cacheKey);
+  if (!audio) {
+    const audioUrl = `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
+    audio = new Audio(audioUrl);
+    state.audioCache.set(cacheKey, audio);
   }
-}
+  audio.volume = dubbingVolume;
+  audio.currentTime = 0;
+  state.currentPlayingAudio = audio;
 
-function speakKhmerTextWithCallback(text, onEnd) {
-  if (!("speechSynthesis" in window)) {
-    if (onEnd) onEnd();
-    return;
-  }
-  const clean = text.replace(/\[.*?\]/g, "").replace(/【.*?】/g, "").replace(/🎬|⚡|🔥|🌟|🎙️/g, "").trim();
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.rate = state.ttsSpeed;
-  utterance.pitch = 1.0;
-
-  const voices = window.speechSynthesis.getVoices();
-  const kmVoice = voices.find(v => v.lang.startsWith("km")) || voices.find(v => v.lang.startsWith("th")) || voices[0];
-  if (kmVoice) utterance.voice = kmVoice;
-
-  utterance.onend = utterance.onerror = () => {
-    if (onEnd) onEnd();
+  audio.onended = onSpeechEnd;
+  audio.onerror = () => {
+    console.warn("Audio play issue on cue:", cue.index);
+    onSpeechEnd();
   };
-  window.speechSynthesis.speak(utterance);
+
+  audio.play().catch(err => {
+    console.warn("Audio play issue:", err);
+    onSpeechEnd();
+  });
 }
 
 function preloadSubtitleAudio() {
   if (state.subtitles.length === 0) return;
+  const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
   let count = 0;
   state.subtitles.forEach(cue => {
     const text = (cue.translated || cue.original || "").trim();
     if (text) {
-      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}`;
+      const cacheKey = `${voice}_${cue.index}`;
+      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
       const audio = new Audio();
       audio.preload = "auto";
       audio.src = audioUrl;
-      state.audioCache.set(cue.index, audio);
+      state.audioCache.set(cacheKey, audio);
       count++;
     }
   });
@@ -1091,12 +1080,13 @@ function exportAllKhmerAudioClips() {
     alert("សូមបញ្ចូល និងបកប្រែ Subtitle ជាមុនសិន!");
     return;
   }
+  const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
   state.subtitles.forEach((cue, i) => {
     const text = (cue.translated || cue.original || "").trim();
     if (text) {
       const link = document.createElement("a");
-      link.href = `/api/tts?text=${encodeURIComponent(text)}`;
-      link.download = `cue_${String(i + 1).padStart(3, "0")}_khmer.mp3`;
+      link.href = `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
+      link.download = `cue_${String(i + 1).padStart(3, "0")}_khmer_${voice}.mp3`;
       link.target = "_blank";
       document.body.appendChild(link);
       link.click();

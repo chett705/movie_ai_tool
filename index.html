@@ -299,13 +299,19 @@
                 <span id="audio-status" class="audio-status">រួចរាល់សម្រាប់ចាក់</span>
               </div>
             </div>
-            <div class="audio-waves">
-              <span class="wave-bar"></span>
-              <span class="wave-bar"></span>
-              <span class="wave-bar"></span>
-              <span class="wave-bar"></span>
-              <span class="wave-bar"></span>
-              <span class="wave-bar"></span>
+            <div class="audio-hud-right" style="display: flex; align-items: center; gap: 10px;">
+              <select id="select-recap-voice" class="cinema-select-sm" style="max-width: 170px;">
+                <option value="piseth" selected>👨 លោក ពិសិដ្ឋ (ប្រុស)</option>
+                <option value="sreymom">👩 អ្នកនាង ស្រីមុំ (ស្រី)</option>
+              </select>
+              <div class="audio-waves">
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+              </div>
             </div>
           </div>
 
@@ -366,10 +372,10 @@
           <!-- Video Dubbing Audio Control Bar -->
           <div class="dubbing-controls-panel">
             <div class="dubbing-control-item">
-              <label for="select-tts-engine"><i class="fa-solid fa-robot"></i> ប្រភពសំឡេង AI:</label>
-              <select id="select-tts-engine" class="cinema-select-sm">
-                <option value="neural" selected>🎙️ Google Neural Khmer (សំឡេងខ្មែរធម្មជាតិច្បាស់)</option>
-                <option value="speechSynthesis">🌐 Browser Web Speech Voice</option>
+              <label for="select-video-voice"><i class="fa-solid fa-microphone-lines text-gold"></i> សំឡេងអ្នកនិយាយ (Khmer Voice):</label>
+              <select id="select-video-voice" class="cinema-select-sm">
+                <option value="piseth" selected>👨 លោក ពិសិដ្ឋ (Piseth - សំឡេងប្រុស ភាពយន្ត)</option>
+                <option value="sreymom">👩 អ្នកនាង ស្រីមុំ (Sreymom - សំឡេងស្រី មនោសញ្ចេតនា)</option>
               </select>
             </div>
 
