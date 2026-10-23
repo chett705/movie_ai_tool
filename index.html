@@ -607,26 +607,44 @@
         </p>
 
         <div class="export-options-list" style="display: flex; flex-direction: column; gap: 12px;">
-          <!-- Option 1: Burn-in Subtitles -->
-          <div class="export-opt-card" id="opt-export-burnin" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
+          <!-- Option 1: Burn-in Subtitles + Khmer Neural Voice Dubbing (Recommended) -->
+          <div class="export-opt-card" id="opt-export-burnin-dubbed" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(245, 158, 11, 0.08); border: 1.5px solid var(--gold-primary); transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
               <div>
-                <strong style="color: var(--gold-primary); font-size: 1.05rem;"><i class="fa-solid fa-fire text-amber"></i> បង្កប់អក្សររត់ខ្មែរលើវីដេអូ (Burn-in Subtitles MP4)</strong>
-                <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
-                  បង្កប់អក្សររត់ខ្មែរជាប់លើសាច់វីដេអូផ្ទាល់ អាចបង្ហោះលើ Facebook, TikTok, YouTube ឬមើលលើទូរស័ព្ទបានគ្រប់ប្រភេទ។
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="tag" style="background: var(--gold-primary); color: #000; font-weight: bold; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">🌟 ពេញនិយមបំផុត (Recommended)</span>
+                  <strong style="color: var(--gold-primary); font-size: 1.05rem;"><i class="fa-solid fa-microphone-lines text-gold"></i> វីដេអូមានអក្សររត់ + សំឡេងអត្ថាធិប្បាយខ្មែរ AI (MP4)</strong>
+                </div>
+                <p style="margin: 6px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                  បង្កប់អក្សររត់ខ្មែរម៉ូតស្អាត (Khmer UI គ្មានបាត់ជើង) + លាយបញ្ចូលសំឡេងអត្ថាធិប្បាយខ្មែរ AI តាមពេលវេលាជាក់ស្តែង!
                 </p>
               </div>
-              <button id="btn-do-export-burnin" class="btn-primary-glow" style="white-space: nowrap;">
-                <i class="fa-solid fa-download"></i> ទាញយក MP4
+              <button id="btn-do-export-burnin-dubbed" class="btn-primary-glow" style="white-space: nowrap; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                <i class="fa-solid fa-cloud-arrow-down"></i> ទាញយក MP4 ពេញលេញ
               </button>
             </div>
           </div>
 
-          <!-- Option 2: Softsub Embed -->
+          <!-- Option 2: Burn-in Subtitles Only -->
+          <div class="export-opt-card" id="opt-export-burnin" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <strong style="color: var(--cyan-primary); font-size: 1.05rem;"><i class="fa-solid fa-closed-captioning text-cyan"></i> បង្កប់អក្សររត់ខ្មែរតែប៉ុណ្ណោះ (Burn-in Subtitles Only)</strong>
+                <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                  បង្កប់អក្សររត់ខ្មែរជាប់លើសាច់វីដេអូផ្ទាល់ ដោយរក្សាទុកសំឡេងវីដេអូដើម (Original Audio)។
+                </p>
+              </div>
+              <button id="btn-do-export-burnin" class="btn-cinema-sm" style="white-space: nowrap;">
+                <i class="fa-solid fa-download"></i> ទាញយក Subtitle MP4
+              </button>
+            </div>
+          </div>
+
+          <!-- Option 3: Softsub Embed -->
           <div class="export-opt-card" id="opt-export-softsub" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
               <div>
-                <strong style="color: var(--cyan-primary); font-size: 1.05rem;"><i class="fa-solid fa-bolt text-cyan"></i> វីដេអូបន្ថែម Subtitle Track (Fast Softsub MP4 - 1s)</strong>
+                <strong style="color: var(--text-primary); font-size: 1.05rem;"><i class="fa-solid fa-bolt text-gold"></i> វីដេអូភ្ជាប់ Subtitle Track (Fast Softsub MP4 - 1s)</strong>
                 <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
                   ទាញយកលឿនត្រឹមតែ ១ វិនាទី (No re-encoding) អាចបើក/បិទ Subtitle ខ្មែរបានលើ VLC, Smart TV, ឬ Player ផ្សេងៗ។
                 </p>
@@ -637,13 +655,13 @@
             </div>
           </div>
 
-          <!-- Option 3: Download SRT file -->
+          <!-- Option 4: Download SRT file -->
           <div class="export-opt-card" id="opt-export-srt" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
               <div>
-                <strong style="color: var(--amber-glow); font-size: 1.05rem;"><i class="fa-solid fa-closed-captioning text-gold"></i> ទាញយកឯកសារ Subtitle (.srt)</strong>
+                <strong style="color: var(--amber-glow); font-size: 1.05rem;"><i class="fa-solid fa-file-lines text-gold"></i> ទាញយកឯកសារ Subtitle (.srt)</strong>
                 <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
-                  ទាញយក File អក្សររត់ខ្មែរសុទ្ធ (.srt) សម្រាប់ប្រើជាមួយ Video Editing Software (Premiere, CapCut, etc.)។
+                  ទាញយក File អក្សររត់ខ្មែរសុទ្ធ (.srt) UTF-8 សម្រាប់ប្រើជាមួយ Video Editing Software (Premiere, CapCut, etc.)។
                 </p>
               </div>
               <button id="btn-do-export-srt" class="btn-cinema-sm" style="white-space: nowrap;">

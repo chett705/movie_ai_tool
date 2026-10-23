@@ -165,7 +165,7 @@ const server = http.createServer((req, res) => {
     req.on("end", () => {
       try {
         const payload = JSON.parse(body);
-        const { videoFilename, srtText, mode = "burnin" } = payload;
+        const { videoFilename, srtText, mode = "burnin_dubbed", voice = "piseth", ducking = 0.20 } = payload;
 
         if (!srtText || !srtText.trim()) {
           res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -214,7 +214,15 @@ const server = http.createServer((req, res) => {
         fs.writeFileSync(tempSrt, srtText, "utf-8");
 
         const exporterScript = path.join(BASE_DIR, "video_exporter.py");
-        const args = [exporterScript, "--video", videoPath, "--srt", tempSrt, "--output", outputMp4, "--mode", mode];
+        const args = [
+          exporterScript,
+          "--video", videoPath,
+          "--srt", tempSrt,
+          "--output", outputMp4,
+          "--mode", mode,
+          "--voice", voice || "piseth",
+          "--ducking", String(ducking || 0.20)
+        ];
 
         execFile("python", args, { timeout: 600000 }, (error, stdout, stderr) => {
           fs.unlink(tempSrt, () => {});
@@ -227,11 +235,16 @@ const server = http.createServer((req, res) => {
           }
 
           const exportFilename = path.basename(outputMp4);
+          let modeLabel = "KhmerDubbed_Sub";
+          if (mode === "burnin") modeLabel = "KhmerSub";
+          else if (mode === "dubbed_only") modeLabel = "KhmerDubbed";
+          else if (mode === "softsub") modeLabel = "SoftSub";
+
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({
             success: true,
             downloadUrl: `/temp_uploads/${exportFilename}`,
-            filename: `CineKhmer_${mode === "burnin" ? "BurnedSub" : "SoftSub"}_${cleanName}`,
+            filename: `CineKhmer_${modeLabel}_${cleanName}`,
             sizeBytes: fs.statSync(outputMp4).size
           }));
         });

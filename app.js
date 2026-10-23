@@ -175,6 +175,7 @@ const elements = {
   // Export Video Modal
   exportVideoModal: document.getElementById("export-video-modal"),
   btnCloseExportModal: document.getElementById("btn-close-export-modal"),
+  btnDoExportBurninDubbed: document.getElementById("btn-do-export-burnin-dubbed"),
   btnDoExportBurnin: document.getElementById("btn-do-export-burnin"),
   btnDoExportSoftsub: document.getElementById("btn-do-export-softsub"),
   btnDoExportSrt: document.getElementById("btn-do-export-srt"),
@@ -756,7 +757,9 @@ function generateVttOutput() {
 }
 
 function downloadFile(content, filename, type = "text/plain;charset=utf-8") {
-  const blob = new Blob([content], { type });
+  // Prepend UTF-8 BOM (\uFEFF) for text/SRT/VTT to ensure Windows Notepad, VLC, Premiere parse Khmer characters accurately!
+  const finalContent = content.startsWith("\ufeff") ? content : ("\ufeff" + content);
+  const blob = new Blob([finalContent], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -767,10 +770,23 @@ function downloadFile(content, filename, type = "text/plain;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
-async function startVideoExport(mode = "burnin") {
+async function startVideoExport(mode = "burnin_dubbed") {
   if (state.subtitles.length === 0) {
-    alert("សូមបកប្រែ Subtitle ជាមុនសិន!");
+    alert("សូមបកប្រែ ឬបញ្ចូល Subtitle ជាមុនសិន!");
     return;
+  }
+
+  // Check if subtitles need translation
+  const untranslatedCount = state.subtitles.filter(s => !s.translated || !s.translated.trim()).length;
+  if (untranslatedCount > 0 && untranslatedCount === state.subtitles.length) {
+    elements.exportVideoModal?.classList.add("hidden");
+    const doTrans = confirm("Subtitle មិនទាន់បានបកប្រែជាភាសាខ្មែរនៅឡើយទេ។ តើអ្នកចង់ឲ្យ AI បកប្រែជាភាសាខ្មែរឥឡូវនេះដែរឬទេ?");
+    if (doTrans) {
+      await translateAllSubtitles();
+      elements.exportVideoModal?.classList.remove("hidden");
+    } else {
+      return;
+    }
   }
 
   const srtText = generateSrtOutput(false);
@@ -782,26 +798,34 @@ async function startVideoExport(mode = "burnin") {
     if (fn && !fn.includes("Simulation")) filename = fn;
   }
 
+  const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
+  const ducking = state.videoDuckingLevel || 0.20;
+
   elements.exportModalProgress?.classList.remove("hidden");
+  if (elements.btnDoExportBurninDubbed) elements.btnDoExportBurninDubbed.disabled = true;
   if (elements.btnDoExportBurnin) elements.btnDoExportBurnin.disabled = true;
   if (elements.btnDoExportSoftsub) elements.btnDoExportSoftsub.disabled = true;
 
   if (elements.exportStatusText) {
-    elements.exportStatusText.innerHTML = mode === "burnin"
-      ? '<i class="fa-solid fa-spinner fa-spin"></i> FFmpeg កំពុងបង្កប់អក្សររត់ខ្មែរលើសាច់វីដេអូ... (សូមរង់ចាំបន្តិច)'
-      : '<i class="fa-solid fa-spinner fa-spin"></i> កំពុងភ្ជាប់ Subtitle Track ចូលក្នុង MP4...';
+    if (mode === "burnin_dubbed") {
+      elements.exportStatusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> កំពុងបង្កប់អក្សររត់ខ្មែរ (Khmer UI) & លាយបញ្ចូលសំឡេងអត្ថាធិប្បាយខ្មែរ AI...';
+    } else if (mode === "burnin") {
+      elements.exportStatusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> FFmpeg កំពុងបង្កប់អក្សររត់ខ្មែរលើសាច់វីដេអូ... (សូមរង់ចាំបន្តិច)';
+    } else {
+      elements.exportStatusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> កំពុងភ្ជាប់ Subtitle Track ចូលក្នុង MP4...';
+    }
   }
-  if (elements.exportStatusBar) elements.exportStatusBar.style.width = "40%";
-  if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = "40%";
+  if (elements.exportStatusBar) elements.exportStatusBar.style.width = "25%";
+  if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = "25%";
 
-  let progressVal = 40;
+  let progressVal = 25;
   const progressTimer = setInterval(() => {
     if (progressVal < 92) {
-      progressVal += mode === "burnin" ? 4 : 18;
+      progressVal += mode === "burnin_dubbed" ? 4 : (mode === "burnin" ? 6 : 18);
       if (elements.exportStatusBar) elements.exportStatusBar.style.width = `${progressVal}%`;
       if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = `${progressVal}%`;
     }
-  }, 2000);
+  }, 1800);
 
   try {
     const resp = await fetch("/api/export-video", {
@@ -810,7 +834,9 @@ async function startVideoExport(mode = "burnin") {
       body: JSON.stringify({
         videoFilename: filename,
         srtText: srtText,
-        mode: mode
+        mode: mode,
+        voice: voice,
+        ducking: ducking
       })
     });
 
@@ -843,7 +869,7 @@ async function startVideoExport(mode = "burnin") {
     setTimeout(() => {
       elements.exportVideoModal?.classList.add("hidden");
       elements.exportModalProgress?.classList.add("hidden");
-    }, 2000);
+    }, 2500);
 
   } catch (err) {
     clearInterval(progressTimer);
@@ -852,6 +878,7 @@ async function startVideoExport(mode = "burnin") {
     elements.exportModalProgress?.classList.add("hidden");
   } finally {
     clearInterval(progressTimer);
+    if (elements.btnDoExportBurninDubbed) elements.btnDoExportBurninDubbed.disabled = false;
     if (elements.btnDoExportBurnin) elements.btnDoExportBurnin.disabled = false;
     if (elements.btnDoExportSoftsub) elements.btnDoExportSoftsub.disabled = false;
   }
@@ -1774,6 +1801,10 @@ function bindEvents() {
     }
   });
 
+  elements.btnDoExportBurninDubbed?.addEventListener("click", () => {
+    startVideoExport("burnin_dubbed");
+  });
+
   elements.btnDoExportBurnin?.addEventListener("click", () => {
     startVideoExport("burnin");
   });
@@ -1786,6 +1817,24 @@ function bindEvents() {
     const srt = generateSrtOutput(false);
     downloadFile(srt, "movie_subtitles_khmer.srt");
     elements.exportVideoModal?.classList.add("hidden");
+  });
+
+  // Card row click shortcuts
+  document.getElementById("opt-export-burnin-dubbed")?.addEventListener("click", (e) => {
+    if (!e.target.closest("button")) startVideoExport("burnin_dubbed");
+  });
+  document.getElementById("opt-export-burnin")?.addEventListener("click", (e) => {
+    if (!e.target.closest("button")) startVideoExport("burnin");
+  });
+  document.getElementById("opt-export-softsub")?.addEventListener("click", (e) => {
+    if (!e.target.closest("button")) startVideoExport("softsub");
+  });
+  document.getElementById("opt-export-srt")?.addEventListener("click", (e) => {
+    if (!e.target.closest("button")) {
+      const srt = generateSrtOutput(false);
+      downloadFile(srt, "movie_subtitles_khmer.srt");
+      elements.exportVideoModal?.classList.add("hidden");
+    }
   });
 
   // Recap Generator
