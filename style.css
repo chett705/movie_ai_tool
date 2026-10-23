@@ -1326,3 +1326,166 @@ html, body {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   Video AI Dubbing & Khmer Audio Voiceover Engine Styles
+   ========================================================================== */
+
+.dubbing-live-badge {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(14, 20, 32, 0.88);
+  border: 1px solid var(--cyan-primary);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  animation: fadeIn 0.25s ease;
+}
+
+.pulse-mic-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cyan-primary);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  box-shadow: 0 0 10px var(--cyan-primary);
+  animation: pulseDot 1.2s infinite;
+}
+
+#dubbing-badge-text {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+
+.mini-equalizer {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.mini-equalizer span {
+  width: 2.5px;
+  background: var(--amber-primary);
+  border-radius: 1px;
+  animation: miniWave 0.8s infinite alternate ease-in-out;
+}
+
+.mini-equalizer span:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+.mini-equalizer span:nth-child(2) { height: 12px; animation-delay: 0.3s; }
+.mini-equalizer span:nth-child(3) { height: 7px; animation-delay: 0.2s; }
+.mini-equalizer span:nth-child(4) { height: 10px; animation-delay: 0.4s; }
+
+@keyframes miniWave {
+  0% { height: 3px; }
+  100% { height: 14px; }
+}
+
+.dubbing-controls-panel {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1.2fr auto;
+  gap: 14px;
+  background: rgba(10, 15, 26, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .dubbing-controls-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 550px) {
+  .dubbing-controls-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dubbing-control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dubbing-control-item.flex-end {
+  justify-content: flex-end;
+}
+
+.dubbing-control-item label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cinema-select-sm {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.slider-with-val {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cinema-slider-sm {
+  flex: 1;
+  accent-color: var(--cyan-primary);
+  height: 5px;
+}
+
+.val-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan-primary);
+  background: rgba(6, 182, 212, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 38px;
+  text-align: center;
+}
+
+.timeline-cue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-timeline-play-audio {
+  background: transparent;
+  border: none;
+  color: var(--amber-primary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: transform var(--transition-fast);
+}
+
+.btn-timeline-play-audio:hover {
+  transform: scale(1.2);
+}

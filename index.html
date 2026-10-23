@@ -330,8 +330,13 @@
               <h2>ទស្សនាវីដេអូជាមួយ Subtitle ខ្មែរផ្ទាល់ (Live Sync Preview)</h2>
             </div>
             <div class="video-controls-header">
+              <label class="toggle-switch" title="បញ្ចេញសំឡេងខ្មែរតាមវីដេអូដោយស្វ័យប្រវត្តិ (Khmer AI Dubbing)">
+                <input type="checkbox" id="toggle-khmer-dubbing" checked>
+                <span class="slider"></span>
+                <span class="toggle-label text-cyan"><i class="fa-solid fa-microphone-lines"></i> និយាយខ្មែរ (AI Dubbing)</span>
+              </label>
               <label class="toggle-switch" title="បង្ហាញ Subtitle ទាំងពីរភាសា">
-                <input type="checkbox" id="toggle-bilingual-preview">
+                <input type="checkbox" id="toggle-bilingual-preview" checked>
                 <span class="slider"></span>
                 <span class="toggle-label">Bilingual Subtitles</span>
               </label>
@@ -342,9 +347,52 @@
             <video id="cinema-video" controls playsinline>
               <!-- Built in video element or canvas stream -->
             </video>
+            
+            <!-- Live AI Dubbing Indicator HUD -->
+            <div id="dubbing-live-badge" class="dubbing-live-badge hidden">
+              <div class="pulse-mic-icon"><i class="fa-solid fa-volume-high"></i></div>
+              <span id="dubbing-badge-text">AI កំពុងបញ្ចេញសំឡេងខ្មែរ...</span>
+              <div class="mini-equalizer">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+
             <div id="subtitle-overlay" class="subtitle-overlay-box">
               <p id="overlay-khmer-text" class="sub-khmer-line">សូមស្វាគមន៍មកកាន់ CineKhmer AI</p>
               <p id="overlay-original-text" class="sub-original-line">Welcome to CineKhmer AI Studio</p>
+            </div>
+          </div>
+
+          <!-- Video Dubbing Audio Control Bar -->
+          <div class="dubbing-controls-panel">
+            <div class="dubbing-control-item">
+              <label for="select-tts-engine"><i class="fa-solid fa-robot"></i> ប្រភពសំឡេង AI:</label>
+              <select id="select-tts-engine" class="cinema-select-sm">
+                <option value="neural" selected>🎙️ Google Neural Khmer (សំឡេងខ្មែរធម្មជាតិច្បាស់)</option>
+                <option value="speechSynthesis">🌐 Browser Web Speech Voice</option>
+              </select>
+            </div>
+
+            <div class="dubbing-control-item">
+              <label for="video-ducking-slider"><i class="fa-solid fa-sliders"></i> បន្ថយសំឡេងវីដេអូដើមពេល AI និយាយ:</label>
+              <div class="slider-with-val">
+                <input type="range" id="video-ducking-slider" min="0" max="100" value="20" class="cinema-slider-sm">
+                <span id="ducking-val-display" class="val-badge">20%</span>
+              </div>
+            </div>
+
+            <div class="dubbing-control-item">
+              <label for="dubbing-volume-slider"><i class="fa-solid fa-volume-high"></i> កម្រិតសំឡេង AI និយាយ:</label>
+              <div class="slider-with-val">
+                <input type="range" id="dubbing-volume-slider" min="0" max="100" value="100" class="cinema-slider-sm">
+                <span id="dubbing-vol-display" class="val-badge">100%</span>
+              </div>
+            </div>
+
+            <div class="dubbing-control-item flex-end">
+              <button id="btn-preload-audio" class="btn-accent-sm" title="ទាញយកសំឡេងទុកជាមុនដើម្បីកុំឲ្យរង់ចាំ">
+                <i class="fa-solid fa-bolt"></i> Pre-buffer Audio
+              </button>
             </div>
           </div>
 
@@ -368,8 +416,11 @@
           <div class="panel-header">
             <div class="panel-title">
               <i class="fa-solid fa-timeline text-amber"></i>
-              <h2>បញ្ជីបន្ទាត់ Subtitle តាមពេលវេលា</h2>
+              <h2>បញ្ជីបន្ទាត់ Subtitle & សំឡេង</h2>
             </div>
+            <button id="btn-export-all-mp3" class="btn-cinema-sm" title="ទាញយកសំឡេងខ្មែរគ្រប់បន្ទាត់ទាំងអស់">
+              <i class="fa-solid fa-file-audio text-gold"></i> ទាញយក MP3
+            </button>
           </div>
           <div id="player-timeline-list" class="timeline-items-list">
             <!-- Dynamically populated -->

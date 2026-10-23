@@ -203,14 +203,38 @@ class MovieAiTranslator:
 """
         return recap_template
 
+    def download_khmer_audio(self, text, output_path):
+        """Download native Khmer TTS audio clip (.mp3)."""
+        if not text.strip():
+            return False
+        try:
+            url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=km&client=tw-ob&q={urllib.parse.quote(text)}"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://translate.google.com/"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = resp.read()
+                os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(data)
+            return True
+        except Exception as e:
+            print(f"[Audio Error] Could not download audio for '{text[:20]}...': {e}", file=sys.stderr)
+            return False
+
 def main():
-    parser = argparse.ArgumentParser(description="Movie AI Translator to Khmer (ភាសាខ្មែរ)")
+    parser = argparse.ArgumentParser(description="Movie AI Translator & Dubber to Khmer (ភាសាខ្មែរ)")
     parser.add_argument("--input", "-i", help="Path to input subtitle file (.srt, .vtt, .txt)")
     parser.add_argument("--output", "-o", help="Path to output translated file")
     parser.add_argument("--bilingual", action="store_true", help="Generate bilingual subtitles (Khmer + Original)")
     parser.add_argument("--style", default="cinematic", choices=["cinematic", "recap", "action", "dramatic"], help="Translation tone")
     parser.add_argument("--plot", help="Path to movie plot file to generate Khmer recap script")
     parser.add_argument("--recap", action="store_true", help="Generate viral movie recap script")
+    parser.add_argument("--audio", action="store_true", help="Generate and download synchronized Khmer MP3 audio dubbing clips")
     parser.add_argument("--key", help="Google Gemini API key (optional, uses free engine if omitted)")
 
     args = parser.parse_args()
@@ -228,20 +252,52 @@ def main():
             print(f"[✔] Recap script saved to {args.output}")
         else:
             print("\n" + script)
+
+        if args.audio:
+            audio_out = (os.path.splitext(args.output)[0] + "_narration.mp3") if args.output else "recap_narration.mp3"
+            print(f"[*] Downloading Khmer narration audio to {audio_out}...")
+            translator.download_khmer_audio(script[:300], audio_out)
+            print(f"[✔] Audio narration clip saved to: {audio_out}")
         return
 
     if args.input:
         with open(args.input, "r", encoding="utf-8") as f:
             content = f.read()
-        translated_srt = translator.translate_srt_file(content, bilingual=args.bilingual)
+        subs = translator.parse_srt(content)
+        total = len(subs)
+        print(f"[*] Found {total} subtitle cues. Starting translation to Khmer ({args.style} style)...")
+
+        audio_dir = None
+        if args.audio:
+            base = os.path.splitext(args.output or args.input)[0]
+            audio_dir = base + "_audio_dub"
+            os.makedirs(audio_dir, exist_ok=True)
+            print(f"[*] Audio Dubbing enabled! Saving MP3s to: {audio_dir}/")
+
+        for idx, sub in enumerate(subs, 1):
+            orig = sub["text"]
+            translated = translator.translate_text(orig)
+            sub["original"] = orig
+            sub["text"] = translated
+            print(f"[{idx}/{total}] {orig} -> {translated}")
+
+            if args.audio and translated:
+                mp3_path = os.path.join(audio_dir, f"cue_{idx:03d}_khmer.mp3")
+                translator.download_khmer_audio(translated, mp3_path)
+
+            time.sleep(0.15)
+
+        translated_srt = translator.generate_srt(subs, bilingual=args.bilingual)
         out_file = args.output or (os.path.splitext(args.input)[0] + "_khmer.srt")
         with open(out_file, "w", encoding="utf-8") as f:
             f.write(translated_srt)
         print(f"\n[✔] Successfully translated! Saved to: {out_file}")
+        if args.audio:
+            print(f"[✔] Synchronized Khmer audio dubbing clips saved in: {audio_dir}/")
         return
 
     print("Movie AI Translator to Khmer - Please specify --input <file.srt> or --plot <story.txt>")
-    print("Example: python translate_movie.py --input samples/action_movie_sample.srt --bilingual")
+    print("Example: python translate_movie.py --input samples/action_movie_sample.srt --bilingual --audio")
 
 if __name__ == "__main__":
     main()
