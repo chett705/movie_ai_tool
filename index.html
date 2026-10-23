@@ -414,6 +414,10 @@
               </label>
               <input type="file" id="video-srt-input" accept=".srt,.vtt,.txt" class="hidden">
 
+              <button id="btn-video-transcribe-voice" class="btn-primary-glow" title="AI ស្តាប់សំឡេងតួនិយាយក្នុងវីដេអូ បង្កើត Subtitle និងបកប្រែខ្មែរស្វ័យប្រវត្តិ">
+                <i class="fa-solid fa-microphone-lines text-gold"></i> ស្តាប់សំឡេងតួ & បកប្រែខ្មែរ (Speech AI)
+              </button>
+
               <button id="btn-video-translate-now" class="btn-cinema-sm" title="បកប្រែ Subtitle ភាពយន្តជាភាសាខ្មែរ">
                 <i class="fa-solid fa-language text-cyan"></i> បកប្រែជាភាសាខ្មែរ (Translate)
               </button>
@@ -441,12 +445,22 @@
           <!-- Helper Banner when user uploads video -->
           <div id="video-helper-banner" class="video-helper-box hidden">
             <div class="helper-content">
-              <i class="fa-solid fa-circle-info text-cyan"></i>
-              <span>បានបង្ហាញវីដេអូលើ Display! សូមបញ្ចូលឯកសារ <strong>Subtitle (.srt)</strong> ឬចុច <strong>ប្រើ Subtitle គំរូ</strong> ដើម្បីឲ្យ AI បកប្រែ និងនិយាយខ្មែរតាមវីដេអូ។</span>
+              <i class="fa-solid fa-microphone-lines text-cyan" style="font-size: 1.5rem;"></i>
+              <div>
+                <strong style="color: var(--cyan-primary);">វីដេអូបានបង្ហាញរួចរាល់!</strong>
+                <p style="margin: 4px 0 0; font-size: 0.88rem; color: var(--text-secondary);">
+                  ជ្រើសរើស <strong>"ស្តាប់សំឡេងតួនិយាយ"</strong> ដើម្បីឲ្យ AI ស្តាប់ពាក្យសម្ដីក្នុងវីដេអូ បង្កើត Subtitle និងបកប្រែជាភាសាខ្មែរភ្លាមៗ ឬបញ្ចូលឯកសារ Subtitle (.srt)។
+                </p>
+              </div>
             </div>
-            <button id="btn-video-use-sample" class="btn-cinema-sm">
-              <i class="fa-solid fa-wand-magic-sparkles text-gold"></i> ប្រើ Subtitle គំរូ & បកប្រែភ្លាម
-            </button>
+            <div class="helper-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button id="btn-banner-transcribe" class="btn-primary-glow">
+                <i class="fa-solid fa-wand-magic-sparkles text-gold"></i> 🎙️ ស្តាប់សំឡេងតួ & បកប្រែខ្មែរភ្លាម
+              </button>
+              <button id="btn-video-use-sample" class="btn-cinema-sm">
+                <i class="fa-solid fa-file-lines text-gold"></i> ប្រើ Subtitle គំរូ
+              </button>
+            </div>
           </div>
         </div>
 

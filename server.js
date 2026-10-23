@@ -100,6 +100,63 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API Endpoint: Video Audio Speech-to-Text & Movie Translation
+  // POST /api/transcribe-video?style=cinematic&filename=...
+  if (reqPath === "/api/transcribe-video" && req.method === "POST") {
+    const urlObj = new URL(req.url, `http://${req.headers.host || "localhost:3000"}`);
+    const style = urlObj.searchParams.get("style") || "cinematic";
+    const filename = urlObj.searchParams.get("filename") || "video.mp4";
+    const ext = path.extname(filename) || ".mp4";
+
+    const uploadsDir = path.join(BASE_DIR, "temp_uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const tempFile = path.join(uploadsDir, `upload_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+    const writeStream = fs.createWriteStream(tempFile);
+
+    req.pipe(writeStream);
+
+    writeStream.on("error", (err) => {
+      console.error("[Upload Stream Error]:", err);
+      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ success: false, error: "Upload failed: " + err.message }));
+    });
+
+    writeStream.on("finish", () => {
+      const transcriberScript = path.join(BASE_DIR, "video_transcriber.py");
+      const args = [transcriberScript, "--input", tempFile, "--style", style, "--json"];
+
+      execFile("python", args, { timeout: 180000, maxBuffer: 15 * 1024 * 1024 }, (error, stdout, stderr) => {
+        // Clean up temporary uploaded file
+        fs.unlink(tempFile, () => {});
+
+        if (error) {
+          console.error("[Transcription Error]:", error, stderr);
+          res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ success: false, error: stderr || error.message }));
+          return;
+        }
+
+        try {
+          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(jsonMatch[0]);
+          } else {
+            res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ success: false, error: "No JSON output from transcriber", raw: stdout }));
+          }
+        } catch (e) {
+          res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+    });
+    return;
+  }
+
   // Static File Serving
   if (reqPath === "/") reqPath = "/index.html";
 

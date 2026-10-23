@@ -325,6 +325,7 @@ class MovieAiTranslator:
 
 def main():
     parser = argparse.ArgumentParser(description="Movie AI Translator & Dubber to Khmer (ភាសាខ្មែរ)")
+    parser.add_argument("--video", "-v", help="Path to input video or audio file to transcribe character speech and translate to Khmer")
     parser.add_argument("--input", "-i", help="Path to input subtitle file (.srt, .vtt, .txt)")
     parser.add_argument("--output", "-o", help="Path to output translated file")
     parser.add_argument("--bilingual", action="store_true", help="Generate bilingual subtitles (Khmer + Original)")
@@ -337,6 +338,32 @@ def main():
 
     args = parser.parse_args()
     translator = MovieAiTranslator(api_key=args.key, style=args.style)
+
+    if args.video:
+        print(f"[*] Listening to character voices in video: {args.video}...")
+        from video_transcriber import transcribe_and_translate_video, build_srt_content
+        res = transcribe_and_translate_video(args.video, style=args.style)
+        subs = res["subtitles"]
+        total = len(subs)
+        print(f"[✔] Detected {total} spoken dialogues ({res['duration']}s duration).")
+
+        audio_dir = None
+        if args.audio:
+            base = os.path.splitext(args.output or args.video)[0]
+            audio_dir = base + f"_audio_dub_{args.voice}"
+            os.makedirs(audio_dir, exist_ok=True)
+            print(f"[*] Generating synchronized Khmer audio dubbing clips ({args.voice})...")
+            for sub in subs:
+                mp3_path = os.path.join(audio_dir, f"cue_{sub['index']:03d}_khmer.mp3")
+                translator.download_khmer_audio(sub['translated'], mp3_path, voice=args.voice)
+            print(f"[✔] Audio dubbing files saved in: {audio_dir}/")
+
+        out_file = args.output or (os.path.splitext(args.video)[0] + "_khmer.srt")
+        srt_text = build_srt_content(subs, bilingual=args.bilingual)
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(srt_text)
+        print(f"[✔] Khmer subtitles saved to: {out_file}")
+        return
 
     if args.plot or (args.input and args.recap):
         target_path = args.plot or args.input
