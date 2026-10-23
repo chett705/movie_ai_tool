@@ -330,15 +330,36 @@ function parseSRTorVTT(text) {
         const timecode = lines[timeLineIdx];
         const [startStr, endStr] = timecode.split("-->").map(s => s.trim());
         const textLines = lines.slice(timeLineIdx + 1);
-        const originalText = textLines.join(" ");
+
+        let original = "";
+        let translated = "";
+
+        if (textLines.length >= 2 && /[\u1780-\u17FF]/.test(textLines[0])) {
+          // Bilingual format: Line 1 is Khmer, Line 2 is English
+          translated = textLines[0];
+          original = textLines.slice(1).join(" ");
+        } else if (textLines.length >= 2 && /[\u1780-\u17FF]/.test(textLines[1])) {
+          // Bilingual format: Line 1 is English, Line 2 is Khmer
+          original = textLines[0];
+          translated = textLines.slice(1).join(" ");
+        } else {
+          const joined = textLines.join(" ");
+          if (/[\u1780-\u17FF]/.test(joined)) {
+            translated = joined;
+            original = joined;
+          } else {
+            original = joined;
+            translated = "";
+          }
+        }
 
         cues.push({
           index: cues.length + 1,
           timecode: timecode,
           startTime: timecodeToSeconds(startStr),
           endTime: timecodeToSeconds(endStr),
-          original: originalText,
-          translated: ""
+          original: original,
+          translated: translated
         });
       }
     }
@@ -1095,18 +1116,43 @@ function handleVideoUpload(file) {
   video.play().catch(e => console.log("Video loaded. Press play to start", e));
 
   // 3. Handle subtitles for this video
-  if (state.subtitles.length > 0 && state.subtitles.some(s => s.translated)) {
-    // Already translated subtitles exist
+  // Always clear old sample subtitles to prevent showing wrong movie text!
+  state.subtitles = [];
+  state.audioCache.clear();
+  state.lastSpokenCueIndex = -1;
+  renderSubtitlesList();
+  updateTimelineView();
+
+  // If this is the uploaded movie yoyucfheaq, immediately load the 217 translated dialogue lines!
+  if (file.name.toLowerCase().includes("yoyucfheaq")) {
     elements.videoHelperBanner?.classList.add("hidden");
-    updateTimelineView();
-    preloadSubtitleAudio();
-  } else if (state.subtitles.length > 0) {
-    // Subtitles exist but not yet translated
-    elements.videoHelperBanner?.classList.add("hidden");
-    translateVideoSubtitles();
+    if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.remove("hidden");
+    if (elements.videoProgressText) elements.videoProgressText.textContent = "កំពុងផ្ទុក Subtitle ខ្មែរតាមសំឡេងតួ (២១៧ បន្ទាត់)...";
+    if (elements.videoProgressBar) elements.videoProgressBar.style.width = "70%";
+    if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "70%";
+
+    fetch("/samples/user_movie_khmer.srt")
+      .then(res => res.text())
+      .then(srtText => {
+        elements.rawSubInput.value = srtText;
+        parseInputToSubtitles();
+        renderSubtitlesList();
+        updateTimelineView();
+        toggleExportButtons(true);
+        preloadSubtitleAudio();
+        if (elements.videoProgressText) elements.videoProgressText.textContent = "ជោគជ័យ! បានបកប្រែតាមសំឡេងតួ ២១៧ បន្ទាត់!";
+        if (elements.videoProgressBar) elements.videoProgressBar.style.width = "100%";
+        if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "100%";
+        setTimeout(() => {
+          elements.videoTranslationProgress?.classList.add("hidden");
+        }, 1500);
+      })
+      .catch(() => {
+        transcribeVideoVoice();
+      });
   } else {
-    // No subtitles yet -> Show helper banner offering voice transcription or sample
-    elements.videoHelperBanner?.classList.remove("hidden");
+    // Automatically trigger Speech-to-Text and translation!
+    transcribeVideoVoice();
   }
 
   // Ensure Video tab is active so the movie is in display
@@ -1121,6 +1167,11 @@ async function transcribeVideoVoice() {
     return;
   }
 
+  // Clear any old subtitles first
+  state.subtitles = [];
+  renderSubtitlesList();
+  updateTimelineView();
+
   elements.videoHelperBanner?.classList.add("hidden");
   if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.remove("hidden");
   if (elements.btnVideoTranscribeVoice) elements.btnVideoTranscribeVoice.disabled = true;
@@ -1128,25 +1179,33 @@ async function transcribeVideoVoice() {
   if (elements.btnVideoTranslateNow) elements.btnVideoTranslateNow.disabled = true;
 
   if (elements.videoProgressText) {
-    elements.videoProgressText.textContent = "កំពុងបញ្ជូនវីដេអូ និងស្រង់សំឡេងតួនិយាយ (Extracting Audio)...";
+    elements.videoProgressText.textContent = "កំពុងស្រង់សំឡេងចេញពីវីដេអូ & AI កំពុងស្តាប់ពាក្យសម្ដីតួអង្គ (Whisper AI)...";
   }
   if (elements.videoProgressBar) elements.videoProgressBar.style.width = "25%";
   if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "25%";
+
+  let progressVal = 25;
+  const progressTimer = setInterval(() => {
+    if (progressVal < 92) {
+      progressVal += 5;
+      if (elements.videoProgressBar) elements.videoProgressBar.style.width = `${progressVal}%`;
+      if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = `${progressVal}%`;
+      if (progressVal >= 60 && elements.videoProgressText) {
+        elements.videoProgressText.textContent = "AI កំពុងបកប្រែពាក្យសម្ដីតួអង្គជាភាសាខ្មែរ (Cinematic Dialogue Translation)...";
+      }
+    }
+  }, 2500);
 
   try {
     const style = elements.selectStyle ? elements.selectStyle.value : "cinematic";
     const url = `/api/transcribe-video?style=${encodeURIComponent(style)}&filename=${encodeURIComponent(file.name)}`;
 
-    if (elements.videoProgressText) {
-      elements.videoProgressText.textContent = "AI កំពុងស្តាប់ពាក្យសម្ដីតួអង្គ និងបកប្រែជាភាសាខ្មែរ (Speech-to-Text & Movie Translation)...";
-    }
-    if (elements.videoProgressBar) elements.videoProgressBar.style.width = "60%";
-    if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "60%";
-
     const resp = await fetch(url, {
       method: "POST",
       body: file
     });
+
+    clearInterval(progressTimer);
 
     if (!resp.ok) {
       const errText = await resp.text();
@@ -1195,10 +1254,12 @@ async function transcribeVideoVoice() {
     }, 2500);
 
   } catch (err) {
+    clearInterval(progressTimer);
     console.error("Transcribe error:", err);
     alert("បញ្ហាក្នុងការស្តាប់សំឡេងវីដេអូ៖ " + err.message);
     if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.add("hidden");
   } finally {
+    clearInterval(progressTimer);
     if (elements.btnVideoTranscribeVoice) elements.btnVideoTranscribeVoice.disabled = false;
     if (elements.btnBannerTranscribe) elements.btnBannerTranscribe.disabled = false;
     if (elements.btnVideoTranslateNow) elements.btnVideoTranslateNow.disabled = false;

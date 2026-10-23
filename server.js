@@ -128,7 +128,7 @@ const server = http.createServer((req, res) => {
       const transcriberScript = path.join(BASE_DIR, "video_transcriber.py");
       const args = [transcriberScript, "--input", tempFile, "--style", style, "--json"];
 
-      execFile("python", args, { timeout: 180000, maxBuffer: 15 * 1024 * 1024 }, (error, stdout, stderr) => {
+      execFile("python", args, { timeout: 600000, maxBuffer: 30 * 1024 * 1024 }, (error, stdout, stderr) => {
         // Clean up temporary uploaded file
         fs.unlink(tempFile, () => {});
 

@@ -97,16 +97,20 @@ def transcribe_and_translate_video(video_path: str, style="cinematic", model_siz
     2. Transcribes spoken dialogues with timestamps using faster-whisper.
     3. Translates spoken dialogues to authentic Khmer movie character dialogue.
     """
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+
     audio = extract_audio_pcm(video_path)
     duration_sec = len(audio) / 16000.0
 
-    # Load faster-whisper model
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    # Load faster-whisper model with optimized CPU threads
+    threads = min(os.cpu_count() or 4, 8)
+    model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=threads)
     transcribe_args = {
-        "beam_size": 5,
+        "beam_size": 1,  # Fast greedy search (3-4x faster than beam_size=5)
         "vad_filter": True,
         "word_timestamps": True,
-        "vad_parameters": {"min_silence_duration_ms": 400}
+        "vad_parameters": {"min_silence_duration_ms": 350}
     }
     if language:
         transcribe_args["language"] = language
@@ -115,8 +119,7 @@ def transcribe_and_translate_video(video_path: str, style="cinematic", model_siz
     detected_lang = getattr(info, "language", language or "en")
 
     translator = MovieAiTranslator(style=style)
-    subtitles = []
-    cue_index = 1
+    raw_cues = []
 
     for seg in segments:
         dialogue_lines = split_segment_sentences(seg)
@@ -131,19 +134,37 @@ def transcribe_and_translate_video(video_path: str, style="cinematic", model_siz
                 end_time = round(start_time + 1.2, 2)
 
             timecode = f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
-
-            # Translate character dialogue into natural Khmer
-            khmer_translation = translator.translate_text(text, source_lang=detected_lang, target_lang="km")
-
-            subtitles.append({
-                "index": cue_index,
+            raw_cues.append({
                 "startTime": start_time,
                 "endTime": end_time,
                 "timecode": timecode,
-                "original": text,
-                "translated": khmer_translation
+                "original": text
             })
-            cue_index += 1
+
+    # Translate concurrently for ultra-fast performance on long movies
+    def _translate_item(item):
+        orig_text = item["original"]
+        khmer = translator.translate_text(orig_text, source_lang=detected_lang, target_lang="km")
+        return {
+            "startTime": item["startTime"],
+            "endTime": item["endTime"],
+            "timecode": item["timecode"],
+            "original": orig_text,
+            "translated": khmer
+        }
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        subtitles = list(pool.map(_translate_item, raw_cues))
+
+    for idx, sub in enumerate(subtitles, 1):
+        sub["index"] = idx
+
+    return {
+        "success": True,
+        "duration": round(duration_sec, 2),
+        "language": detected_lang,
+        "subtitles": subtitles
+    }
 
     return {
         "success": True,
