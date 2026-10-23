@@ -1,0 +1,22 @@
+{
+  "name": "movie_ai_tool",
+  "version": "1.0.0",
+  "description": "AI-Powered Movie Subtitle & Script Translator to Khmer (ភាសាខ្មែរ) with Live Video Subtitle Synchronization and Movie Recap Generator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "translate": "python translate_movie.py"
+  },
+  "keywords": [
+    "movie-ai",
+    "khmer-translation",
+    "subtitles",
+    "srt",
+    "vtt",
+    "movie-recap",
+    "khmer-tts"
+  ],
+  "author": "chett705",
+  "license": "MIT"
+}

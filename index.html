@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineKhmer AI - Movie AI Translator to Khmer (បកប្រែភាពយន្តជាភាសាខ្មែរ)</title>
+  <meta name="description" content="AI-powered Movie Subtitle & Script Translator to Khmer. Translate SRT, generate viral movie recaps (សង្ខេបរឿង), preview synchronized video subtitles, and export bilingual captions.">
+  
+  <!-- Google Fonts: Kantumruy Pro (Khmer) & Outfit (Latin) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-cinema">
+  <div class="background-ambient">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-film"></i>
+          <span class="pulse-dot"></span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">
+            <span class="gradient-text">CineKhmer</span> <span class="badge-ai">AI 2.0</span>
+          </div>
+          <div class="brand-subtitle">ឧបករណ៍បកប្រែភាពយន្ត និងសង្ខេបរឿងជាភាសាខ្មែរ</div>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button id="tab-btn-subtitles" class="nav-tab active" data-tab="tab-subtitles">
+          <i class="fa-solid fa-closed-captioning"></i>
+          <span>បកប្រែ Subtitle (SRT/VTT)</span>
+        </button>
+        <button id="tab-btn-recap" class="nav-tab" data-tab="tab-recap">
+          <i class="fa-solid fa-microphone-lines"></i>
+          <span>សង្ខេបភាពយន្ត AI (Recap Script)</span>
+        </button>
+        <button id="tab-btn-video" class="nav-tab" data-tab="tab-video">
+          <i class="fa-solid fa-circle-play"></i>
+          <span>ចាក់វីដេអូ & Subtitle ផ្ទាល់</span>
+        </button>
+        <button id="tab-btn-glossary" class="nav-tab" data-tab="tab-glossary">
+          <i class="fa-solid fa-book-bookmark"></i>
+          <span>វចនានុក្រមតួអង្គ (Glossary)</span>
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button id="btn-open-settings" class="btn-icon" title="AI Engine Settings">
+          <i class="fa-solid fa-sliders"></i>
+          <span id="active-engine-badge" class="engine-indicator">Free AI</span>
+        </button>
+        <a href="https://github.com/chett705/movie_ai_tool" target="_blank" class="btn-icon" title="GitHub Repository">
+          <i class="fa-brands fa-github"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Quick Samples Banner -->
+    <div class="quick-samples-bar">
+      <span class="samples-label"><i class="fa-solid fa-wand-magic-sparkles"></i> គំរូតេស្តរហ័ស (Quick Samples):</span>
+      <button class="sample-chip" data-sample="action">
+        <i class="fa-solid fa-gun"></i> ឈុតប្រយុទ្ធ Action Sci-Fi
+      </button>
+      <button class="sample-chip" data-sample="horror">
+        <i class="fa-solid fa-ghost"></i> ឈុតរន្ធត់ Horror Mystery
+      </button>
+      <button class="sample-chip" data-sample="drama">
+        <i class="fa-solid fa-heart"></i> ឈុតស្នេហា Romance
+      </button>
+      <button class="sample-chip" data-sample="recap">
+        <i class="fa-solid fa-fire"></i> សាច់រឿងសង្ខេប The Shadow Protocol
+      </button>
+    </div>
+
+    <!-- TAB 1: SUBTITLE TRANSLATION -->
+    <section id="tab-subtitles" class="tab-pane active">
+      <div class="cinema-grid">
+        <!-- Input & Controls Column -->
+        <div class="panel-card glassmorphism">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-file-import text-amber"></i>
+              <h2>ឯកសារ Subtitle ដើម (Original Subtitle)</h2>
+            </div>
+            <div class="file-badges">
+              <span class="tag">SRT</span>
+              <span class="tag">VTT</span>
+              <span class="tag">TXT</span>
+            </div>
+          </div>
+
+          <!-- Drag and Drop Zone -->
+          <div id="drop-zone" class="drop-zone">
+            <input type="file" id="file-input" accept=".srt,.vtt,.txt" class="file-input-hidden">
+            <div class="drop-content">
+              <div class="drop-icon">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <p class="drop-main">អូសទម្លាក់ឯកសារ .SRT / .VTT នៅទីនេះ ឬចុចដើម្បីជ្រើសរើស</p>
+              <p class="drop-hint">គាំទ្រ Subtitles គ្រប់ទម្រង់ (UTF-8, English, Thai, Chinese, etc.)</p>
+            </div>
+          </div>
+
+          <div class="editor-subhead">
+            <span>ឬបិទភ្ជាប់អត្ថបទ Subtitle ដោយផ្ទាល់៖</span>
+            <button id="btn-clear-input" class="btn-text-sm"><i class="fa-solid fa-trash"></i> សម្អាត</button>
+          </div>
+          <textarea id="raw-sub-input" class="cinema-textarea" rows="8" placeholder="1&#10;00:00:01,500 --> 00:00:04,200&#10;Commander, we've lost contact with Sector 7.&#10;&#10;2&#10;00:00:04,800 --> 00:00:07,900&#10;What do you mean lost contact?"></textarea>
+
+          <!-- Translation Settings Bar -->
+          <div class="translation-controls">
+            <div class="control-group">
+              <label for="select-style"><i class="fa-solid fa-masks-theater"></i> ទម្រង់បកប្រែភាពយន្ត (Movie Style):</label>
+              <select id="select-style" class="cinema-select">
+                <option value="cinematic" selected>🎬 ភាពយន្តរស់រវើក (Cinematic Dialogue)</option>
+                <option value="recap">🎙️ ស្ទីលអ្នកអត្ថាធិប្បាយរឿង (Recap Narrator)</option>
+                <option value="action">⚡ សកម្មភាពញាប់រហ័ស (Intense Action)</option>
+                <option value="drama">💖 មនោសញ្ចេតនាស៊ីជម្រៅ (Emotional Drama)</option>
+                <option value="royal">👑 រឿងបុរាណ / រាជសព្ទ (Ancient / Royal Kingdom)</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="select-source-lang"><i class="fa-solid fa-globe"></i> ភាសាដើម (Source Lang):</label>
+              <select id="select-source-lang" class="cinema-select">
+                <option value="auto" selected>ស្វ័យប្រវត្តិ (Auto Detect)</option>
+                <option value="en">អង់គ្លេស (English)</option>
+                <option value="th">ថៃ (Thai)</option>
+                <option value="zh">ចិន (Chinese)</option>
+                <option value="ko">កូរ៉េ (Korean)</option>
+                <option value="ja">ជប៉ុន (Japanese)</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btn-translate-subtitles" class="btn-primary-action pulse-glow">
+            <i class="fa-solid fa-bolt"></i>
+            <span>ចាប់ផ្ដើមបកប្រែជាភាសាខ្មែរ (Translate to Khmer)</span>
+          </button>
+          
+          <div id="translation-progress-container" class="progress-wrap hidden">
+            <div class="progress-meta">
+              <span id="progress-text">កំពុងបកប្រែ...</span>
+              <span id="progress-percentage">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Translated Output & Subtitle Live Editor -->
+        <div class="panel-card glassmorphism">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-language text-cyan"></i>
+              <h2>លទ្ធផល Subtitle ជាភាសាខ្មែរ (Khmer Subtitles)</h2>
+            </div>
+            <div class="cue-count-badge">
+              <span id="cue-counter">0</span> Cues
+            </div>
+          </div>
+
+          <!-- Actions Toolbar -->
+          <div class="output-toolbar">
+            <div class="btn-group">
+              <button id="btn-export-srt" class="btn-cinema-sm" disabled>
+                <i class="fa-solid fa-download"></i> ទាញយក SRT ខ្មែរ
+              </button>
+              <button id="btn-export-bilingual" class="btn-cinema-sm" disabled>
+                <i class="fa-solid fa-layer-group"></i> SRT ពីរភាសា (Bilingual)
+              </button>
+              <button id="btn-export-vtt" class="btn-cinema-sm" disabled>
+                <i class="fa-solid fa-file-code"></i> ទាញយក VTT
+              </button>
+              <button id="btn-copy-translated" class="btn-cinema-sm" disabled>
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+            <button id="btn-send-to-player" class="btn-accent-sm" disabled>
+              <i class="fa-solid fa-play"></i> បញ្ជូនទៅកាន់ Video Player
+            </button>
+          </div>
+
+          <!-- Subtitle Live Cues Grid / Editor -->
+          <div id="subtitles-list" class="subtitles-editor-container">
+            <div class="empty-placeholder">
+              <i class="fa-solid fa-film empty-icon"></i>
+              <h3>មិនទាន់មានទិន្នន័យ Subtitle នៅឡើយទេ</h3>
+              <p>សូមជ្រើសរើសឯកសារ ឬចុចប៊ូតុង <strong>គំរូតេស្តរហ័ស</strong> ខាងលើដើម្បីចាប់ផ្ដើមសាកល្បង</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MOVIE RECAP GENERATOR -->
+    <section id="tab-recap" class="tab-pane">
+      <div class="recap-layout">
+        <div class="panel-card glassmorphism">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-clapperboard text-red"></i>
+              <h2>បញ្ចូលសាច់រឿងសង្ខេប / Movie Synopsis</h2>
+            </div>
+          </div>
+
+          <p class="section-desc">
+            បំលែងសាច់រឿងភាពយន្ត ទៅជាស្គ្រីបអត្ថាធិប្បាយសង្ខេបរឿងបែប Viral សម្រាប់បង្ហោះលើ <strong>TikTok, Facebook Reels និង YouTube</strong> ដោយស្វ័យប្រវត្តិ។
+          </p>
+
+          <div class="recap-inputs-grid">
+            <div class="input-block">
+              <label for="recap-movie-title"><i class="fa-solid fa-heading"></i> ចំណងជើងភាពយន្ត (Movie Title):</label>
+              <input type="text" id="recap-movie-title" class="cinema-input" placeholder="ឧ. The Shadow Protocol (ពិភពស្រមោលសម្ងាត់)">
+            </div>
+            <div class="input-block">
+              <label for="recap-movie-genre"><i class="fa-solid fa-tags"></i> ប្រភេទភាពយន្ត (Genre):</label>
+              <select id="recap-movie-genre" class="cinema-select">
+                <option value="Action Thriller">🔥 Action / Thriller (សកម្មភាព / កក្រើក)</option>
+                <option value="Sci-Fi Mystery">🤖 Sci-Fi / Cyberpunk (វិទ្យាសាស្ត្រ / បច្ចេកវិទ្យា)</option>
+                <option value="Horror Ghost">👻 Horror / Paranormal (រន្ធត់ / ខ្មោចព្រាយ)</option>
+                <option value="Crime Detective">🕵️ Crime / Detective (ស៊ើបអង្កេតឃាតកម្ម)</option>
+                <option value="Emotional Romance">💖 Romance / Drama (ស្នេហាកម្សត់)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="recap-options-grid">
+            <div class="input-block">
+              <label for="recap-duration"><i class="fa-solid fa-stopwatch"></i> រយៈពេលវីដេអូសង្ខេប (Target Duration):</label>
+              <select id="recap-duration" class="cinema-select">
+                <option value="1">⚡ 1 នាទី (Shorts / TikTok / Reels)</option>
+                <option value="3" selected>🔥 3 នាទី (Standard Viral Recap)</option>
+                <option value="8">🎬 8-10 នាទី (Full In-depth Story for YouTube)</option>
+              </select>
+            </div>
+            <div class="input-block">
+              <label for="recap-tone"><i class="fa-solid fa-bullhorn"></i> សំឡេងអ្នកអត្ថាធិប្បាយ (Narrator Style):</label>
+              <select id="recap-tone" class="cinema-select">
+                <option value="suspense" selected>😱 បែបរំភើបរន្ធត់ ជក់ចិត្ត (Suspense & Thrill)</option>
+                <option value="witty">😎 បែបកំប្លុកកំប្លែង បាញ់ចំៗ (Humorous & Sarcastic)</option>
+                <option value="dark">🌑 បែបអាថ៌កំបាំង ព្រឺព្រួច (Dark & Mysterious)</option>
+                <option value="emotional">🥺 បែបមនោសញ្ចេតនា កម្សត់ (Deep Emotional)</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="recap-plot-text"><i class="fa-solid fa-align-left"></i> សេចក្តីសង្ខេបសាច់រឿង ឬសាច់រឿងដើម (Plot Details):</label>
+          <textarea id="recap-plot-text" class="cinema-textarea" rows="7" placeholder="បញ្ចូលសាច់រឿងជាភាសាអង់គ្លេស ឬភាសាផ្សេងៗ ដើម្បីឲ្យ AI បំលែងទៅជាស្គ្រីបអត្ថាធិប្បាយខ្មែរ..."></textarea>
+
+          <button id="btn-generate-recap" class="btn-primary-action pulse-glow">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>បង្កើតស្គ្រីបអត្ថាធិប្បាយខ្មែរ (Generate Khmer Recap Script)</span>
+          </button>
+        </div>
+
+        <div class="panel-card glassmorphism">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-scroll text-gold"></i>
+              <h2>ស្គ្រីបអត្ថាធិប្បាយសង្ខេបភាពយន្ត (Generated Script)</h2>
+            </div>
+            <div class="recap-actions">
+              <button id="btn-speak-recap" class="btn-icon-sm" title="ស្តាប់ការអានសាកល្បង (TTS Voiceover)">
+                <i class="fa-solid fa-volume-high"></i>
+              </button>
+              <button id="btn-copy-recap" class="btn-icon-sm" title="Copy Script">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+              <button id="btn-download-recap" class="btn-icon-sm" title="Download Text">
+                <i class="fa-solid fa-download"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Audio Waveform Visualizer for Voiceover -->
+          <div id="audio-player-hud" class="audio-hud hidden">
+            <div class="audio-hud-left">
+              <button id="btn-tts-toggle" class="btn-play-circle"><i class="fa-solid fa-play"></i></button>
+              <div class="audio-info">
+                <span class="audio-title">សំឡេងអត្ថាធិប្បាយ AI Voiceover Preview</span>
+                <span id="audio-status" class="audio-status">រួចរាល់សម្រាប់ចាក់</span>
+              </div>
+            </div>
+            <div class="audio-waves">
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+            </div>
+          </div>
+
+          <div id="recap-output-container" class="recap-output-view">
+            <div class="empty-placeholder">
+              <i class="fa-solid fa-microphone empty-icon"></i>
+              <h3>មិនទាន់មានស្គ្រីបអត្ថាធិប្បាយនៅឡើយទេ</h3>
+              <p>សូមបំពេញព័ត៌មានខាងឆ្វេង ឬចុចគំរូ <strong>The Shadow Protocol</strong> ខាងលើ រួចចុចបង្កើតស្គ្រីប</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: VIDEO PLAYER & SUBTITLE SYNC -->
+    <section id="tab-video" class="tab-pane">
+      <div class="video-player-grid">
+        <div class="panel-card glassmorphism video-column">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-tv text-cyan"></i>
+              <h2>ទស្សនាវីដេអូជាមួយ Subtitle ខ្មែរផ្ទាល់ (Live Sync Preview)</h2>
+            </div>
+            <div class="video-controls-header">
+              <label class="toggle-switch" title="បង្ហាញ Subtitle ទាំងពីរភាសា">
+                <input type="checkbox" id="toggle-bilingual-preview">
+                <span class="slider"></span>
+                <span class="toggle-label">Bilingual Subtitles</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="video-container" id="video-wrapper">
+            <video id="cinema-video" controls playsinline>
+              <!-- Built in video element or canvas stream -->
+            </video>
+            <div id="subtitle-overlay" class="subtitle-overlay-box">
+              <p id="overlay-khmer-text" class="sub-khmer-line">សូមស្វាគមន៍មកកាន់ CineKhmer AI</p>
+              <p id="overlay-original-text" class="sub-original-line">Welcome to CineKhmer AI Studio</p>
+            </div>
+          </div>
+
+          <div class="video-source-bar">
+            <div class="source-left">
+              <label for="video-file-input" class="btn-cinema-sm">
+                <i class="fa-solid fa-upload"></i> ជ្រើសរើសវីដេអូពីកុំព្យូទ័រ (.mp4/.webm)
+              </label>
+              <input type="file" id="video-file-input" accept="video/mp4,video/webm" class="hidden">
+              <button id="btn-load-demo-video" class="btn-cinema-sm">
+                <i class="fa-solid fa-clapperboard"></i> ប្រើវីដេអូគំរូ (Cinema Canvas Simulator)
+              </button>
+            </div>
+            <div class="source-right">
+              <span id="video-filename" class="tag-file">វីដេអូ៖ Demo Simulation Video</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card glassmorphism timeline-column">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-timeline text-amber"></i>
+              <h2>បញ្ជីបន្ទាត់ Subtitle តាមពេលវេលា</h2>
+            </div>
+          </div>
+          <div id="player-timeline-list" class="timeline-items-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: GLOSSARY MANAGER -->
+    <section id="tab-glossary" class="tab-pane">
+      <div class="glossary-layout">
+        <div class="panel-card glassmorphism">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fa-solid fa-book-atlas text-gold"></i>
+              <h2>វចនានុក្រមភាពយន្ត & ឈ្មោះតួអង្គ (Character & Movie Glossary)</h2>
+            </div>
+            <button id="btn-add-glossary-term" class="btn-accent-sm">
+              <i class="fa-solid fa-plus"></i> បន្ថែមពាក្យថ្មី
+            </button>
+          </div>
+
+          <p class="section-desc">
+            កំណត់ឈ្មោះតួអង្គ តំណែង និងពាក្យស្លោកក្នុងភាពយន្ត ដើម្បីឲ្យ AI បកប្រែបានត្រូវន័យ និងមានភាពស៊ីសង្វាក់គ្នាតាំងពីដើមដល់ចប់រឿង។
+          </p>
+
+          <div class="glossary-table-wrap">
+            <table class="glossary-table">
+              <thead>
+                <tr>
+                  <th>ពាក្យដើម / ឈ្មោះតួអង្គ (Original Term / Name)</th>
+                  <th>ការបកប្រែជាភាសាខ្មែរ (Khmer Translation)</th>
+                  <th>ចំណាត់ថ្នាក់ (Category)</th>
+                  <th>សកម្មភាព</th>
+                </tr>
+              </thead>
+              <tbody id="glossary-tbody">
+                <!-- Dynamically generated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: AI ENGINE SETTINGS -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card glassmorphism">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-sliders text-cyan"></i>
+          <h3>ការកំណត់ម៉ាស៊ីន AI (AI Engine & API Configuration)</h3>
+        </div>
+        <button id="btn-close-settings" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="setting-item">
+          <label class="setting-label">ម៉ាស៊ីនបកប្រែចម្បង (Translation Provider):</label>
+          <div class="radio-card-group">
+            <label class="radio-card active">
+              <input type="radio" name="ai_provider" value="free" checked>
+              <div class="radio-content">
+                <div class="radio-title"><i class="fa-solid fa-bolt text-gold"></i> Built-in Free AI Engine</div>
+                <div class="radio-desc">បកប្រែឥតគិតថ្លៃ គ្មានដែនកំណត់ មិនត្រូវការ API Key</div>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="ai_provider" value="gemini">
+              <div class="radio-content">
+                <div class="radio-title"><i class="fa-solid fa-brain text-cyan"></i> Google Gemini Pro / Flash</div>
+                <div class="radio-desc">បកប្រែបែបភាពយន្តរស់រវើកកម្រិតខ្ពស់ និងសរសេរស្គ្រីបសង្ខេបរឿងពេញលេញ</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="gemini-key-section" class="setting-item hidden">
+          <label for="gemini-api-key" class="setting-label">Google Gemini API Key:</label>
+          <input type="password" id="gemini-api-key" class="cinema-input" placeholder="AIzaSy...">
+          <small class="helper-text">
+            អ្នកអាចបង្កើត Gemini API Key ឥតគិតថ្លៃបាននៅ <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a>។ Key នឹងត្រូវរក្សាទុកតែលើ Browser របស់អ្នកប៉ុណ្ណោះ។
+          </small>
+        </div>
+
+        <div class="setting-item">
+          <label for="tts-voice-speed" class="setting-label">ល្បឿនសំឡេង Voiceover TTS:</label>
+          <input type="range" id="tts-voice-speed" min="0.7" max="1.4" step="0.1" value="1.0" class="cinema-slider">
+          <div class="slider-labels">
+            <span>យឺត (0.7x)</span>
+            <span id="speed-value">ធម្មតា (1.0x)</span>
+            <span>លឿន (1.4x)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn-primary-action">
+          <i class="fa-solid fa-check"></i> រក្សាទុកការកំណត់
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <span>🎬 <strong>CineKhmer AI</strong> - Next-Gen Khmer Movie Translation & Narration Suite</span>
+      </div>
+      <div class="footer-right">
+        <span>GitHub: <a href="https://github.com/chett705/movie_ai_tool" target="_blank">chett705/movie_ai_tool</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

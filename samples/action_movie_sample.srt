@@ -1,0 +1,23 @@
+1
+00:00:01,500 --> 00:00:04,200
+Commander, we've lost contact with Sector 7.
+
+2
+00:00:04,800 --> 00:00:07,900
+What do you mean lost contact? Check the backup radar!
+
+3
+00:00:08,400 --> 00:00:11,600
+The entire perimeter grid just went dark. Something is coming.
+
+4
+00:00:12,100 --> 00:00:15,300
+Listen to me carefully. Get all civilians to the underground bunker right now!
+
+5
+00:00:15,800 --> 00:00:18,500
+Sir, they've breached the outer defense gates!
+
+6
+00:00:19,000 --> 00:00:22,800
+Lock and load! Today, we hold this line no matter what happens!
