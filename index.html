@@ -192,6 +192,9 @@
               <button id="btn-copy-translated" class="btn-cinema-sm" disabled>
                 <i class="fa-solid fa-copy"></i> Copy
               </button>
+              <button id="btn-export-video-tab1" class="btn-primary-glow" disabled title="ទាញយកវីដេអូជាមួយអក្សររត់ខ្មែរ">
+                <i class="fa-solid fa-download text-gold"></i> Export Video
+              </button>
             </div>
             <button id="btn-send-to-player" class="btn-accent-sm" disabled>
               <i class="fa-solid fa-play"></i> បញ្ជូនទៅកាន់ Video Player
@@ -425,6 +428,10 @@
               <button id="btn-load-demo-video" class="btn-cinema-sm">
                 <i class="fa-solid fa-clapperboard"></i> វីដេអូគំរូ (Demo)
               </button>
+
+              <button id="btn-export-video" class="btn-primary-glow" disabled title="ទាញយកវីដេអូជាមួយអក្សររត់ ឬសំឡេងខ្មែរ">
+                <i class="fa-solid fa-download text-gold"></i> ទាញយកវីដេអូ (Export Video)
+              </button>
             </div>
             <div class="source-right">
               <span id="video-filename" class="tag-file">វីដេអូ៖ Demo Simulation Video</span>
@@ -470,9 +477,14 @@
               <i class="fa-solid fa-timeline text-amber"></i>
               <h2>បញ្ជីបន្ទាត់ Subtitle & សំឡេង</h2>
             </div>
-            <button id="btn-export-all-mp3" class="btn-cinema-sm" title="ទាញយកសំឡេងខ្មែរគ្រប់បន្ទាត់ទាំងអស់">
-              <i class="fa-solid fa-file-audio text-gold"></i> ទាញយក MP3
-            </button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="btn-export-video-side" class="btn-primary-glow" disabled title="ទាញយកវីដេអូជាមួយអក្សររត់ខ្មែរ">
+                <i class="fa-solid fa-download text-gold"></i> Export Video
+              </button>
+              <button id="btn-export-all-mp3" class="btn-cinema-sm" title="ទាញយកសំឡេងខ្មែរគ្រប់បន្ទាត់ទាំងអស់">
+                <i class="fa-solid fa-file-audio text-gold"></i> MP3
+              </button>
+            </div>
           </div>
           <div id="player-timeline-list" class="timeline-items-list">
             <!-- Dynamically populated -->
@@ -574,6 +586,85 @@
         <button id="btn-save-settings" class="btn-primary-action">
           <i class="fa-solid fa-check"></i> រក្សាទុកការកំណត់
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Video Modal -->
+  <div id="export-video-modal" class="modal-overlay hidden">
+    <div class="modal-card glassmorphism" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-file-video text-gold"></i>
+          <h3>ទាញយកវីដេអូភាពយន្ត (Export Movie Video)</h3>
+        </div>
+        <button id="btn-close-export-modal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.95rem;">
+          សូមជ្រើសរើសទម្រង់ទាញយកវីដេអូជាមួយអក្សររត់ខ្មែរ (Khmer Subtitles)៖
+        </p>
+
+        <div class="export-options-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Option 1: Burn-in Subtitles -->
+          <div class="export-opt-card" id="opt-export-burnin" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <strong style="color: var(--gold-primary); font-size: 1.05rem;"><i class="fa-solid fa-fire text-amber"></i> បង្កប់អក្សររត់ខ្មែរលើវីដេអូ (Burn-in Subtitles MP4)</strong>
+                <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                  បង្កប់អក្សររត់ខ្មែរជាប់លើសាច់វីដេអូផ្ទាល់ អាចបង្ហោះលើ Facebook, TikTok, YouTube ឬមើលលើទូរស័ព្ទបានគ្រប់ប្រភេទ។
+                </p>
+              </div>
+              <button id="btn-do-export-burnin" class="btn-primary-glow" style="white-space: nowrap;">
+                <i class="fa-solid fa-download"></i> ទាញយក MP4
+              </button>
+            </div>
+          </div>
+
+          <!-- Option 2: Softsub Embed -->
+          <div class="export-opt-card" id="opt-export-softsub" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <strong style="color: var(--cyan-primary); font-size: 1.05rem;"><i class="fa-solid fa-bolt text-cyan"></i> វីដេអូបន្ថែម Subtitle Track (Fast Softsub MP4 - 1s)</strong>
+                <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                  ទាញយកលឿនត្រឹមតែ ១ វិនាទី (No re-encoding) អាចបើក/បិទ Subtitle ខ្មែរបានលើ VLC, Smart TV, ឬ Player ផ្សេងៗ។
+                </p>
+              </div>
+              <button id="btn-do-export-softsub" class="btn-cinema-sm" style="white-space: nowrap;">
+                <i class="fa-solid fa-bolt"></i> ទាញយកភ្លាម
+              </button>
+            </div>
+          </div>
+
+          <!-- Option 3: Download SRT file -->
+          <div class="export-opt-card" id="opt-export-srt" style="cursor: pointer; padding: 14px 18px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <strong style="color: var(--amber-glow); font-size: 1.05rem;"><i class="fa-solid fa-closed-captioning text-gold"></i> ទាញយកឯកសារ Subtitle (.srt)</strong>
+                <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                  ទាញយក File អក្សររត់ខ្មែរសុទ្ធ (.srt) សម្រាប់ប្រើជាមួយ Video Editing Software (Premiere, CapCut, etc.)។
+                </p>
+              </div>
+              <button id="btn-do-export-srt" class="btn-cinema-sm" style="white-space: nowrap;">
+                <i class="fa-solid fa-file-arrow-down"></i> ទាញយក SRT
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Export Progress Indicator inside modal -->
+        <div id="export-modal-progress" class="hidden" style="margin-top: 18px; padding: 14px; background: rgba(0,0,0,0.4); border-radius: 10px; border: 1px solid var(--cyan-primary);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span id="export-status-text" style="color: var(--cyan-primary); font-size: 0.9rem;">
+              <i class="fa-solid fa-spinner fa-spin"></i> កំពុងដំណើរការ FFmpeg បង្កប់អក្សររត់ខ្មែរ...
+            </span>
+            <span id="export-status-percentage" style="color: var(--gold-primary); font-weight: bold;">...</span>
+          </div>
+          <div class="progress-track" style="height: 6px;">
+            <div id="export-status-bar" class="progress-fill" style="width: 50%;"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

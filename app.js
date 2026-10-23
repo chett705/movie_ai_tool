@@ -165,9 +165,23 @@ const elements = {
   dubbingVolDisplay: document.getElementById("dubbing-vol-display"),
   btnPreloadAudio: document.getElementById("btn-preload-audio"),
   btnExportAllMp3: document.getElementById("btn-export-all-mp3"),
+  btnExportVideo: document.getElementById("btn-export-video"),
+  btnExportVideoSide: document.getElementById("btn-export-video-side"),
+  btnExportVideoTab1: document.getElementById("btn-export-video-tab1"),
   overlayKhmerText: document.getElementById("overlay-khmer-text"),
   overlayOriginalText: document.getElementById("overlay-original-text"),
   playerTimelineList: document.getElementById("player-timeline-list"),
+  
+  // Export Video Modal
+  exportVideoModal: document.getElementById("export-video-modal"),
+  btnCloseExportModal: document.getElementById("btn-close-export-modal"),
+  btnDoExportBurnin: document.getElementById("btn-do-export-burnin"),
+  btnDoExportSoftsub: document.getElementById("btn-do-export-softsub"),
+  btnDoExportSrt: document.getElementById("btn-do-export-srt"),
+  exportModalProgress: document.getElementById("export-modal-progress"),
+  exportStatusText: document.getElementById("export-status-text"),
+  exportStatusBar: document.getElementById("export-status-bar"),
+  exportStatusPercentage: document.getElementById("export-status-percentage"),
   
   // Tab 4: Glossary
   glossaryTbody: document.getElementById("glossary-tbody"),
@@ -454,6 +468,23 @@ function toggleExportButtons(enabled) {
   elements.btnExportVtt.disabled = !enabled;
   elements.btnCopyTranslated.disabled = !enabled;
   elements.btnSendToPlayer.disabled = !enabled;
+
+  // Video Export Buttons
+  if (elements.btnExportVideo) {
+    elements.btnExportVideo.disabled = !enabled;
+    if (enabled) elements.btnExportVideo.classList.add("btn-ready-pulse");
+    else elements.btnExportVideo.classList.remove("btn-ready-pulse");
+  }
+  if (elements.btnExportVideoSide) {
+    elements.btnExportVideoSide.disabled = !enabled;
+    if (enabled) elements.btnExportVideoSide.classList.add("btn-ready-pulse");
+    else elements.btnExportVideoSide.classList.remove("btn-ready-pulse");
+  }
+  if (elements.btnExportVideoTab1) {
+    elements.btnExportVideoTab1.disabled = !enabled;
+    if (enabled) elements.btnExportVideoTab1.classList.add("btn-ready-pulse");
+    else elements.btnExportVideoTab1.classList.remove("btn-ready-pulse");
+  }
 }
 
 function escapeHtml(str) {
@@ -734,6 +765,96 @@ function downloadFile(content, filename, type = "text/plain;charset=utf-8") {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+async function startVideoExport(mode = "burnin") {
+  if (state.subtitles.length === 0) {
+    alert("សូមបកប្រែ Subtitle ជាមុនសិន!");
+    return;
+  }
+
+  const srtText = generateSrtOutput(false);
+  let filename = "video.mp4";
+  if (state.currentVideoFile && state.currentVideoFile.name) {
+    filename = state.currentVideoFile.name;
+  } else if (elements.videoFilename) {
+    const fn = elements.videoFilename.textContent.replace("វីដេអូ៖", "").trim();
+    if (fn && !fn.includes("Simulation")) filename = fn;
+  }
+
+  elements.exportModalProgress?.classList.remove("hidden");
+  if (elements.btnDoExportBurnin) elements.btnDoExportBurnin.disabled = true;
+  if (elements.btnDoExportSoftsub) elements.btnDoExportSoftsub.disabled = true;
+
+  if (elements.exportStatusText) {
+    elements.exportStatusText.innerHTML = mode === "burnin"
+      ? '<i class="fa-solid fa-spinner fa-spin"></i> FFmpeg កំពុងបង្កប់អក្សររត់ខ្មែរលើសាច់វីដេអូ... (សូមរង់ចាំបន្តិច)'
+      : '<i class="fa-solid fa-spinner fa-spin"></i> កំពុងភ្ជាប់ Subtitle Track ចូលក្នុង MP4...';
+  }
+  if (elements.exportStatusBar) elements.exportStatusBar.style.width = "40%";
+  if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = "40%";
+
+  let progressVal = 40;
+  const progressTimer = setInterval(() => {
+    if (progressVal < 92) {
+      progressVal += mode === "burnin" ? 4 : 18;
+      if (elements.exportStatusBar) elements.exportStatusBar.style.width = `${progressVal}%`;
+      if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = `${progressVal}%`;
+    }
+  }, 2000);
+
+  try {
+    const resp = await fetch("/api/export-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        videoFilename: filename,
+        srtText: srtText,
+        mode: mode
+      })
+    });
+
+    clearInterval(progressTimer);
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Export failed" }));
+      throw new Error(err.error || "Export failed");
+    }
+
+    const data = await resp.json();
+    if (!data.success || !data.downloadUrl) {
+      throw new Error(data.error || "រកមិនឃើញឯកសារទាញយក");
+    }
+
+    if (elements.exportStatusText) {
+      elements.exportStatusText.innerHTML = '<i class="fa-solid fa-check text-green"></i> បង្កើតវីដេអូបានជោគជ័យ! កំពុងទាញយក...';
+    }
+    if (elements.exportStatusBar) elements.exportStatusBar.style.width = "100%";
+    if (elements.exportStatusPercentage) elements.exportStatusPercentage.textContent = "100%";
+
+    // Trigger download
+    const a = document.createElement("a");
+    a.href = data.downloadUrl;
+    a.download = data.filename || `CineKhmer_${filename}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => {
+      elements.exportVideoModal?.classList.add("hidden");
+      elements.exportModalProgress?.classList.add("hidden");
+    }, 2000);
+
+  } catch (err) {
+    clearInterval(progressTimer);
+    console.error("Export error:", err);
+    alert("បញ្ហាក្នុងការទាញយកវីដេអូ៖ " + err.message);
+    elements.exportModalProgress?.classList.add("hidden");
+  } finally {
+    clearInterval(progressTimer);
+    if (elements.btnDoExportBurnin) elements.btnDoExportBurnin.disabled = false;
+    if (elements.btnDoExportSoftsub) elements.btnDoExportSoftsub.disabled = false;
+  }
 }
 
 // ==========================================
@@ -1627,6 +1748,44 @@ function bindEvents() {
     document.getElementById("tab-btn-video").click();
     updateTimelineView();
     elements.cinemaVideo.play();
+  });
+
+  // Export Video Modal handlers
+  const openExportModal = () => {
+    if (state.subtitles.length === 0) {
+      alert("សូមបកប្រែ ឬបញ្ចូល Subtitle ជាមុនសិន!");
+      return;
+    }
+    elements.exportVideoModal?.classList.remove("hidden");
+    elements.exportModalProgress?.classList.add("hidden");
+  };
+
+  elements.btnExportVideo?.addEventListener("click", openExportModal);
+  elements.btnExportVideoSide?.addEventListener("click", openExportModal);
+  elements.btnExportVideoTab1?.addEventListener("click", openExportModal);
+
+  elements.btnCloseExportModal?.addEventListener("click", () => {
+    elements.exportVideoModal?.classList.add("hidden");
+  });
+
+  elements.exportVideoModal?.addEventListener("click", (e) => {
+    if (e.target === elements.exportVideoModal) {
+      elements.exportVideoModal.classList.add("hidden");
+    }
+  });
+
+  elements.btnDoExportBurnin?.addEventListener("click", () => {
+    startVideoExport("burnin");
+  });
+
+  elements.btnDoExportSoftsub?.addEventListener("click", () => {
+    startVideoExport("softsub");
+  });
+
+  elements.btnDoExportSrt?.addEventListener("click", () => {
+    const srt = generateSrtOutput(false);
+    downloadFile(srt, "movie_subtitles_khmer.srt");
+    elements.exportVideoModal?.classList.add("hidden");
   });
 
   // Recap Generator

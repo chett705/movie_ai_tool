@@ -157,6 +157,93 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API Endpoint: Export Video with Subtitles
+  // POST /api/export-video
+  if (reqPath === "/api/export-video" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        const { videoFilename, srtText, mode = "burnin" } = payload;
+
+        if (!srtText || !srtText.trim()) {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ success: false, error: "Missing srtText" }));
+          return;
+        }
+
+        const os = require("os");
+        const uploadsDir = path.join(BASE_DIR, "temp_uploads");
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+        // Locate video file on disk
+        const cleanName = path.basename(videoFilename || "video.mp4");
+        const candidates = [
+          path.join(uploadsDir, cleanName),
+          path.join(BASE_DIR, "samples", cleanName),
+          path.join(BASE_DIR, cleanName),
+          path.join(os.homedir(), "Downloads", cleanName),
+          path.join(os.homedir(), "Desktop", cleanName)
+        ];
+
+        let videoPath = candidates.find(p => fs.existsSync(p));
+
+        // If not found by exact name, look for case-insensitive match in Downloads
+        if (!videoPath) {
+          try {
+            const downloadFiles = fs.readdirSync(path.join(os.homedir(), "Downloads"), { withFileTypes: true });
+            const match = downloadFiles.find(d => d.isFile() && d.name.toLowerCase() === cleanName.toLowerCase());
+            if (match) videoPath = path.join(os.homedir(), "Downloads", match.name);
+          } catch (e) {}
+        }
+
+        if (!videoPath) {
+          res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ 
+            success: false, 
+            error: `រកមិនឃើញ File វីដេអូដើម ${cleanName} នៅលើកុំព្យូទ័រឡើយ។ សូមទាញយកឯកសារ Subtitle (.srt) ជំនួសវិញ!` 
+          }));
+          return;
+        }
+
+        const timestamp = Date.now();
+        const tempSrt = path.join(uploadsDir, `export_${timestamp}.srt`);
+        const outputMp4 = path.join(uploadsDir, `exported_movie_${timestamp}.mp4`);
+
+        fs.writeFileSync(tempSrt, srtText, "utf-8");
+
+        const exporterScript = path.join(BASE_DIR, "video_exporter.py");
+        const args = [exporterScript, "--video", videoPath, "--srt", tempSrt, "--output", outputMp4, "--mode", mode];
+
+        execFile("python", args, { timeout: 600000 }, (error, stdout, stderr) => {
+          fs.unlink(tempSrt, () => {});
+
+          if (error) {
+            console.error("[Export Error]:", error, stderr);
+            res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ success: false, error: stderr || error.message }));
+            return;
+          }
+
+          const exportFilename = path.basename(outputMp4);
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({
+            success: true,
+            downloadUrl: `/temp_uploads/${exportFilename}`,
+            filename: `CineKhmer_${mode === "burnin" ? "BurnedSub" : "SoftSub"}_${cleanName}`,
+            sizeBytes: fs.statSync(outputMp4).size
+          }));
+        });
+
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   // Static File Serving
   if (reqPath === "/") reqPath = "/index.html";
 
