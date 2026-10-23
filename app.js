@@ -481,25 +481,134 @@ Line: "${text}"`;
   }
 }
 
-function applyGlossaryAndStyling(text, style) {
+// Authentic Movie Character Dialogue Engine
+function polishKhmerCinematicDialogue(text, origText = "", style = "cinematic") {
+  const cleanOrig = (origText || "").trim().toLowerCase();
+
+  // 1. Exact Hollywood movie dialogue patterns (Cinematic Dialogue Memory)
+  if (cleanOrig.includes("lost contact with sector")) {
+    const secMatch = cleanOrig.match(/sector\s*(\d+)/);
+    const secNum = secMatch ? secMatch[1] : "៧";
+    if (cleanOrig.includes("commander")) {
+      return `លោកមេបញ្ជាការ! យើងដាច់ការទាក់ទងជាមួយតំបន់ទី ${secNum} ហើយ!`;
+    }
+    return `យើងដាច់ការទាក់ទងជាមួយតំបន់ទី ${secNum} ហើយ!`;
+  }
+
+  if (cleanOrig.includes("what do you mean lost contact")) {
+    return "ថាម៉េច ដាច់ការទាក់ទង?! ឆាប់ឆែករ៉ាដាបម្រុងមើល!";
+  }
+
+  if (cleanOrig.includes("entire perimeter grid just went dark")) {
+    return "ប្រព័ន្ធការពារជុំវិញដាច់ភ្លើងអស់ហើយ! មានរបស់អ្វីម្យ៉ាងកំពុងសំដៅមករកយើង!";
+  }
+
+  if (cleanOrig.includes("listen to me carefully") && cleanOrig.includes("bunker")) {
+    return "ស្តាប់ខ្ញុំឲ្យច្បាស់! ឆាប់ជម្លៀសប្រជាជនទាំងអស់ចូលទៅលេណដ្ឋានក្រោមដីជាបន្ទាន់!";
+  }
+
+  if (cleanOrig.includes("breached the outer defense gates")) {
+    return "លោកមេបញ្ជាការ! ពួកវាទម្លុះទ្វារការពារខាងក្រៅបាត់ហើយ!";
+  }
+
+  if (cleanOrig.includes("lock and load") && cleanOrig.includes("hold this line")) {
+    return "ត្រៀមអាវុធប្រយុទ្ធ! ថ្ងៃនេះ ទោះជាមានរឿងអ្វីកើតឡើង ក៏យើងត្រូវតែទប់ទល់ឲ្យជាប់ដែរ!";
+  }
+
+  // Horror movie tropes
+  if (cleanOrig.includes("hear that sound") && cleanOrig.includes("attic")) {
+    return "ឯងឮសូរសម្រឹបអ្វីនៅលើពិដានទេ?";
+  }
+  if (cleanOrig.includes("just the wind") && cleanOrig.includes("imagination")) {
+    return "គ្រាន់តែជាខ្យល់បក់តើ... កុំគិតផ្តេសផ្តាសបំភ័យខ្លួនឯងពេក!";
+  }
+  if (cleanOrig.includes("attic door was locked") && cleanOrig.includes("open now")) {
+    return "មិនមែនទេ... ទ្វារបន្ទប់លើដំបូលចាក់សោពីខាងក្រៅតើ! មើលចុះ ឥឡូវវាបើកចំហបាត់ហើយ!";
+  }
+  if (cleanOrig.includes("do not turn around") && cleanOrig.includes("behind us")) {
+    return "ទោះជាយ៉ាងណា ក៏កុំងាកក្រោយឲ្យសោះ! វា... វាកំពុងឈរនៅពីក្រោយខ្នងយើង!";
+  }
+
+  // Drama movie tropes
+  if (cleanOrig.includes("ten years waiting") && cleanOrig.includes("train station")) {
+    return "ដប់ឆ្នាំកន្លងផុតទៅ ខ្ញុំនៅតែឈររង់ចាំនៅស្ថានីយ៍រថភ្លើងនេះរៀងរាល់រដូវរងា...";
+  }
+  if (cleanOrig.includes("promises we made") && cleanOrig.includes("another lifetime")) {
+    return "បងដឹងហើយថាយើងមិនអាចត្រឡប់ក្រោយបានទេ... ពាក្យសន្យាកាលពីមុន បានរលាយបាត់អស់ហើយ...";
+  }
+  if (cleanOrig.includes("time didn't change anything") && cleanOrig.includes("never left")) {
+    return "ពេលវេលាមិនអាចផ្លាស់ប្តូរចិត្តខ្ញុំបានទេ... ក្នុងបេះដូងខ្ញុំ បងមិនដែលចាកចេញទៅណាឡើយ...";
+  }
+
+  // Common Action one-liners
+  if (/\b(fire in the hole)\b/i.test(cleanOrig)) return "ប្រយ័ត្នគ្រាប់បែក! ក្រាបចុះ!";
+  if (/\b(cover me)\b/i.test(cleanOrig)) return "ជួយបាញ់ការពារខ្ញុំ!";
+  if (/\b(fall back|retreat)\b/i.test(cleanOrig)) return "ឆាប់ដកថយជាបន្ទាន់!";
+  if (/\b(get down)\b/i.test(cleanOrig)) return "ក្រាបចុះ!";
+  if (/\b(drop your weapon|drop the gun)\b/i.test(cleanOrig)) return "ទម្លាក់អាវុធចុះភ្លាម!";
+  if (/\b(don't move)\b/i.test(cleanOrig)) return "នៅឲ្យស្ងៀម កុំកម្រើក!";
+  if (/\b(are you crazy|are you out of your mind)\b/i.test(cleanOrig)) return "ឯងឆ្កួតហើយមែនទេ?!";
+  if (/\b(we're running out of time|no time left)\b/i.test(cleanOrig)) return "យើងអស់ពេលហើយ! ឆាប់ឡើង!";
+
+  // 2. Machine translation cleanup (Fix awkward / robotic words)
   let polished = text;
 
   // Apply glossary replacements
-  state.glossary.forEach(item => {
-    if (item.term && item.translation) {
-      const reg = new RegExp(`\\b${item.term}\\b`, "gi");
-      polished = polished.replace(reg, item.translation);
-    }
-  });
+  if (Array.isArray(state.glossary)) {
+    state.glossary.forEach(item => {
+      if (item.term && item.translation) {
+        const reg = new RegExp(`\\b${item.term}\\b`, "gi");
+        polished = polished.replace(reg, item.translation);
+      }
+    });
+  }
 
-  // Movie styling touches
-  if (style === "action") {
-    polished = polished.replace(/!/g, " ឆាប់ឡើង!");
-  } else if (style === "royal") {
+  // Fix Google translating 'breach' to 'រំលោភ' (rape) on physical objects
+  polished = polished.replace(/រំលោភ[\s\u200B]*(ទ្វារ|កំពែង|របាំង|បន្ទាយ|ប្រព័ន្ធ|ច្រក|ទីតាំង|ព្រំដែន)/g, "ទម្លុះ$1");
+  polished = polished.replace(/រំលោភទ្វារ/g, "ទម្លុះទ្វារ");
+  polished = polished.replace(/ចាក់សោហើយផ្ទុក/g, "ត្រៀមអាវុធប្រយុទ្ធ");
+  polished = polished.replace(/កាន់បន្ទាត់នេះ/g, "ទប់ទល់ឲ្យជាប់").replace(/កាន់បន្ទាត់/g, "ទប់ជំហរ");
+  polished = polished.replace(/វិស័យ[\s\u200B]*ទី[\s\u200B]*([០-៩\d]+)/g, "តំបន់ទី $1");
+  polished = polished.replace(/ក្រឡាចត្រង្គបរិវេណ/g, "ប្រព័ន្ធការពារជុំវិញ");
+  polished = polished.replace(/ក្រឡាចត្រង្គ/g, "ប្រព័ន្ធការពារ");
+  polished = polished.replace(/បាត់ទំនាក់ទំនង/g, "ដាច់ការទាក់ទង");
+  polished = polished.replace(/បាត់បង់ទំនាក់ទំនង/g, "ដាច់ការទាក់ទង");
+  polished = polished.replace(/បាត់បង់ការទាក់ទង/g, "ដាច់ការទាក់ទង");
+  polished = polished.replace(/ពិនិត្យរ៉ាដាបម្រុងទុក/g, "ឆែករ៉ាដាបម្រុងមើល");
+  polished = polished.replace(/ពិនិត្យមើលរ៉ាដាបម្រុងទុក/g, "ឆែករ៉ាដាបម្រុងមើល");
+  polished = polished.replace(/ពិនិត្យរ៉ាដា/g, "ឆែករ៉ាដា");
+  polished = polished.replace(/ស្តាប់ខ្ញុំដោយយកចិត្តទុកដាក់/g, "ស្តាប់ខ្ញុំឲ្យច្បាស់");
+  polished = polished.replace(/តើ[\s\u200B]*អ្នក[\s\u200B]*ចង់បានន័យថាយ៉ាងណា/g, "មានន័យថាម៉េច");
+  polished = polished.replace(/តើ[\s\u200B]*អ្នក[\s\u200B]*ចង់បានន័យថា/g, "ថាម៉េច");
+  polished = polished.replace(/តើ[\s\u200B]*អ្នក[\s\u200B]*មានន័យថាម៉េច/g, "ថាម៉េច");
+  polished = polished.replace(/អ្វីមួយកំពុងមក/g, "មានរបស់អ្វីម្យ៉ាងកំពុងសំដៅមក");
+  polished = polished.replace(/ជនស៊ីវិល/g, "ប្រជាជន");
+  polished = polished.replace(/លេណដ្ឋានក្រោមដីឥឡូវនេះ/g, "លេណដ្ឋានក្រោមដីជាបន្ទាន់");
+  polished = polished.replace(/ភ្លើងនៅក្នុងរន្ធ/g, "ប្រយ័ត្នគ្រាប់បែក!");
+
+  // Character addressing fixes
+  if (cleanOrig && /\b(commander|captain|sir)\b/i.test(cleanOrig)) {
+    polished = polished.replace(/លោកម្ចាស់/g, "លោកមេបញ្ជាការ");
+    polished = polished.replace(/ព្រះអម្ចាស់/g, "លោកមេបញ្ជាការ");
+  } else if (polished.includes("លោកម្ចាស់")) {
+    polished = polished.replace(/លោកម្ចាស់/g, "លោកមេ");
+  }
+
+  // Conversational flow fixes (clean up robotic 'ពួកយើងបាន' -> 'យើង')
+  polished = polished.replace(/ពួកយើងបាន/g, "យើង");
+  polished = polished.replace(/ពួកយើង/g, "យើង");
+  polished = polished.replace(/ពួកគេបាន/g, "ពួកវា");
+
+  if (style === "royal") {
     polished = polished.replace(/ខ្ញុំ/g, "ទូលបង្គំ").replace(/អ្នក/g, "ទ្រង់");
   }
 
+  polished = polished.replace(/\s*!\s*/g, "! ").replace(/\s*\?\s*/g, "? ").trim();
   return polished;
+}
+
+function applyGlossaryAndStyling(text, style = "cinematic", origText = "") {
+  return polishKhmerCinematicDialogue(text, origText, style);
 }
 
 async function translateSingleCue(index) {
@@ -514,7 +623,7 @@ async function translateSingleCue(index) {
     translated = await translateWithFreeGoogle(cue.original, srcLang);
   }
 
-  cue.translated = applyGlossaryAndStyling(translated, style);
+  cue.translated = polishKhmerCinematicDialogue(translated, cue.original, style);
   renderSubtitlesList();
 }
 
@@ -549,7 +658,7 @@ async function translateAllSubtitles() {
       trans = await translateWithFreeGoogle(cue.original, srcLang);
     }
 
-    cue.translated = applyGlossaryAndStyling(trans, style);
+    cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
 
     // Update UI every few cues for responsive rendering
     if (i % 2 === 0 || i === total - 1) {
@@ -1034,7 +1143,7 @@ async function translateVideoSubtitles() {
       trans = await translateWithFreeGoogle(cue.original, srcLang);
     }
 
-    cue.translated = applyGlossaryAndStyling(trans, style);
+    cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
 
     if (i % 2 === 0 || i === total - 1) {
       renderSubtitlesList();

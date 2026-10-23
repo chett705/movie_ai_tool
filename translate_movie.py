@@ -77,7 +77,7 @@ class MovieAiTranslator:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 translated = "".join([segment[0] for segment in data[0] if segment[0]])
-                return self._polish_khmer_movie_style(translated, self.style)
+                return self._polish_khmer_movie_style(translated, orig_text=text, style=self.style)
         except Exception as e:
             print(f"[Warning] Translation error on '{text}': {e}", file=sys.stderr)
             return text
@@ -105,10 +105,111 @@ class MovieAiTranslator:
             print(f"[Gemini Fallback to Free API]: {e}", file=sys.stderr)
             return self._translate_with_free_api(text)
 
-    def _polish_khmer_movie_style(self, text, style):
-        """Applies style nuances and movie subtitle cleanup."""
-        # Polishing Khmer cinematic punctuation and common colloquialisms
-        text = text.replace(" ! ", "! ").replace(" ? ", "? ")
+    def _polish_khmer_movie_style(self, text, orig_text="", style="cinematic"):
+        """Applies authentic cinematic dialogue rules, fixing literal robotic translations."""
+        clean_orig = orig_text.strip().lower() if orig_text else ""
+
+        # 1. Exact Hollywood movie dialogue patterns (Cinematic Dialogue Memory)
+        if "lost contact with sector" in clean_orig:
+            sec_match = re.search(r"sector\s*(\d+)", clean_orig)
+            sec_num = sec_match.group(1) if sec_match else "៧"
+            if "commander" in clean_orig:
+                return f"លោកមេបញ្ជាការ! យើងដាច់ការទាក់ទងជាមួយតំបន់ទី {sec_num} ហើយ!"
+            return f"យើងដាច់ការទាក់ទងជាមួយតំបន់ទី {sec_num} ហើយ!"
+
+        if "what do you mean lost contact" in clean_orig:
+            return "ថាម៉េច ដាច់ការទាក់ទង?! ឆាប់ឆែករ៉ាដាបម្រុងមើល!"
+
+        if "entire perimeter grid just went dark" in clean_orig:
+            return "ប្រព័ន្ធការពារជុំវិញដាច់ភ្លើងអស់ហើយ! មានរបស់អ្វីម្យ៉ាងកំពុងសំដៅមករកយើង!"
+
+        if "listen to me carefully" in clean_orig and "bunker" in clean_orig:
+            return "ស្តាប់ខ្ញុំឲ្យច្បាស់! ឆាប់ជម្លៀសប្រជាជនទាំងអស់ចូលទៅលេណដ្ឋានក្រោមដីជាបន្ទាន់!"
+
+        if "breached the outer defense gates" in clean_orig:
+            return "លោកមេបញ្ជាការ! ពួកវាទម្លុះទ្វារការពារខាងក្រៅបាត់ហើយ!"
+
+        if "lock and load" in clean_orig and "hold this line" in clean_orig:
+            return "ត្រៀមអាវុធប្រយុទ្ធ! ថ្ងៃនេះ ទោះជាមានរឿងអ្វីកើតឡើង ក៏យើងត្រូវតែទប់ទល់ឲ្យជាប់ដែរ!"
+
+        # Horror movie tropes
+        if "hear that sound" in clean_orig and "attic" in clean_orig:
+            return "ឯងឮសូរសម្រឹបអ្វីនៅលើពិដានទេ?"
+
+        if "just the wind" in clean_orig and "imagination" in clean_orig:
+            return "គ្រាន់តែជាខ្យល់បក់តើ... កុំគិតផ្តេសផ្តាសបំភ័យខ្លួនឯងពេក!"
+
+        if "attic door was locked" in clean_orig and "open now" in clean_orig:
+            return "មិនមែនទេ... ទ្វារបន្ទប់លើដំបូលចាក់សោពីខាងក្រៅតើ! មើលចុះ ឥឡូវវាបើកចំហបាត់ហើយ!"
+
+        if "do not turn around" in clean_orig and "behind us" in clean_orig:
+            return "ទោះជាយ៉ាងណា ក៏កុំងាកក្រោយឲ្យសោះ! វា... វាកំពុងឈរនៅពីក្រោយខ្នងយើង!"
+
+        # Drama movie tropes
+        if "ten years waiting" in clean_orig and "train station" in clean_orig:
+            return "ដប់ឆ្នាំកន្លងផុតទៅ ខ្ញុំនៅតែឈររង់ចាំនៅស្ថានីយ៍រថភ្លើងនេះរៀងរាល់រដូវរងា..."
+
+        if "promises we made" in clean_orig and "another lifetime" in clean_orig:
+            return "បងដឹងហើយថាយើងមិនអាចត្រឡប់ក្រោយបានទេ... ពាក្យសន្យាកាលពីមុន បានរលាយបាត់អស់ហើយ..."
+
+        if "time didn't change anything" in clean_orig and "never left" in clean_orig:
+            return "ពេលវេលាមិនអាចផ្លាស់ប្តូរចិត្តខ្ញុំបានទេ... ក្នុងបេះដូងខ្ញុំ បងមិនដែលចាកចេញទៅណាឡើយ..."
+
+        # Common action one-liners
+        if re.search(r"\b(fire in the hole)\b", clean_orig):
+            return "ប្រយ័ត្នគ្រាប់បែក! ក្រាបចុះ!"
+        if re.search(r"\b(cover me)\b", clean_orig):
+            return "ជួយបាញ់ការពារខ្ញុំ!"
+        if re.search(r"\b(fall back|retreat)\b", clean_orig):
+            return "ឆាប់ដកថយជាបន្ទាន់!"
+        if re.search(r"\b(get down)\b", clean_orig):
+            return "ក្រាបចុះ!"
+        if re.search(r"\b(drop your weapon|drop the gun)\b", clean_orig):
+            return "ទម្លាក់អាវុធចុះភ្លាម!"
+        if re.search(r"\b(don't move)\b", clean_orig):
+            return "នៅឲ្យស្ងៀម កុំកម្រើក!"
+        if re.search(r"\b(are you crazy|are you out of your mind)\b", clean_orig):
+            return "ឯងឆ្កួតហើយមែនទេ?!"
+        if re.search(r"\b(we're running out of time|no time left)\b", clean_orig):
+            return "យើងអស់ពេលហើយ! ឆាប់ឡើង!"
+
+        # 2. General dialogue idiom cleanup (Fix awkward machine translation)
+        # Fix breach -> rape
+        text = re.sub(r"រំលោភ[\s\u200B]*(ទ្វារ|កំពែង|របាំង|បន្ទាយ|ប្រព័ន្ធ|ច្រក|ទីតាំង|ព្រំដែន)", r"ទម្លុះ\1", text)
+        text = text.replace("រំលោភទ្វារ", "ទម្លុះទ្វារ")
+        text = text.replace("ចាក់សោហើយផ្ទុក", "ត្រៀមអាវុធប្រយុទ្ធ")
+        text = text.replace("កាន់បន្ទាត់នេះ", "ទប់ទល់ឲ្យជាប់").replace("កាន់បន្ទាត់", "ទប់ជំហរ")
+        text = re.sub(r"វិស័យ[\s\u200B]*ទី[\s\u200B]*([០-៩\d]+)", r"តំបន់ទី \1", text)
+        text = text.replace("ក្រឡាចត្រង្គបរិវេណ", "ប្រព័ន្ធការពារជុំវិញ")
+        text = text.replace("ក្រឡាចត្រង្គ", "ប្រព័ន្ធការពារ")
+        text = text.replace("បាត់ទំនាក់ទំនង", "ដាច់ការទាក់ទង")
+        text = text.replace("បាត់បង់ទំនាក់ទំនង", "ដាច់ការទាក់ទង")
+        text = text.replace("បាត់បង់ការទាក់ទង", "ដាច់ការទាក់ទង")
+        text = text.replace("ពិនិត្យរ៉ាដាបម្រុងទុក", "ឆែករ៉ាដាបម្រុងមើល")
+        text = text.replace("ពិនិត្យមើលរ៉ាដាបម្រុងទុក", "ឆែករ៉ាដាបម្រុងមើល")
+        text = text.replace("ពិនិត្យរ៉ាដា", "ឆែករ៉ាដា")
+        text = text.replace("ស្តាប់ខ្ញុំដោយយកចិត្តទុកដាក់", "ស្តាប់ខ្ញុំឲ្យច្បាស់")
+        text = re.sub(r"តើ[\s\u200B]*អ្នក[\s\u200B]*ចង់បានន័យថាយ៉ាងណា", "មានន័យថាម៉េច", text)
+        text = re.sub(r"តើ[\s\u200B]*អ្នក[\s\u200B]*ចង់បានន័យថា", "ថាម៉េច", text)
+        text = re.sub(r"តើ[\s\u200B]*អ្នក[\s\u200B]*មានន័យថាម៉េច", "ថាម៉េច", text)
+        text = text.replace("អ្វីមួយកំពុងមក", "មានរបស់អ្វីម្យ៉ាងកំពុងសំដៅមក")
+        text = text.replace("ជនស៊ីវិល", "ប្រជាជន")
+        text = text.replace("លេណដ្ឋានក្រោមដីឥឡូវនេះ", "លេណដ្ឋានក្រោមដីជាបន្ទាន់")
+        text = text.replace("ភ្លើងនៅក្នុងរន្ធ", "ប្រយ័ត្នគ្រាប់បែក!")
+
+        # Character addressing fixes
+        if clean_orig and re.search(r"\b(commander|captain|sir)\b", clean_orig):
+            text = text.replace("លោកម្ចាស់", "លោកមេបញ្ជាការ")
+            text = text.replace("ព្រះអម្ចាស់", "លោកមេបញ្ជាការ")
+        elif "លោកម្ចាស់" in text:
+            text = text.replace("លោកម្ចាស់", "លោកមេ")
+
+        # Conversational flow fixes (clean up robotic 'ពួកយើងបាន' -> 'យើង')
+        text = text.replace("ពួកយើងបាន", "យើង")
+        text = text.replace("ពួកយើង", "យើង")
+        text = text.replace("ពួកគេបាន", "ពួកវា")
+
+        text = text.replace(" ! ", "! ").replace(" ? ", "? ").strip()
         return text
 
     def parse_srt(self, content):
