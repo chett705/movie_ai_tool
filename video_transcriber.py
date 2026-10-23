@@ -91,14 +91,13 @@ def split_segment_sentences(segment):
 
     return lines if lines else [(segment.start, segment.end, segment.text.strip())]
 
-def transcribe_and_translate_video(video_path: str, style="cinematic", model_size="tiny.en", language=None):
+def transcribe_and_translate_video(video_path: str, style="cinematic", model_size="tiny", language=None):
     """
     1. Extracts audio track from video.
     2. Transcribes spoken dialogues with timestamps using faster-whisper.
     3. Translates spoken dialogues to authentic Khmer movie character dialogue.
     """
     import os
-    from concurrent.futures import ThreadPoolExecutor
 
     audio = extract_audio_pcm(video_path)
     duration_sec = len(audio) / 16000.0
@@ -107,64 +106,52 @@ def transcribe_and_translate_video(video_path: str, style="cinematic", model_siz
     threads = min(os.cpu_count() or 4, 8)
     model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=threads)
     transcribe_args = {
-        "beam_size": 1,  # Fast greedy search (3-4x faster than beam_size=5)
+        "beam_size": 1,  # Fast greedy search
         "vad_filter": True,
-        "word_timestamps": True,
-        "vad_parameters": {"min_silence_duration_ms": 350}
+        "word_timestamps": False,  # Fast segment-level transcription for full movies
+        "vad_parameters": {"min_silence_duration_ms": 300}
     }
     if language:
         transcribe_args["language"] = language
 
     segments, info = model.transcribe(audio, **transcribe_args)
-    detected_lang = getattr(info, "language", language or "en")
+    detected_lang = getattr(info, "language", language or "auto")
 
     translator = MovieAiTranslator(style=style)
     raw_cues = []
 
     for seg in segments:
-        dialogue_lines = split_segment_sentences(seg)
-        for (start_t, end_t, text) in dialogue_lines:
-            text = text.strip()
-            if not text:
-                continue
+        text = seg.text.strip()
+        if not text:
+            continue
 
-            start_time = round(start_t, 2)
-            end_time = round(end_t, 2)
-            if end_time - start_time < 1.0:
-                end_time = round(start_time + 1.2, 2)
+        start_time = round(seg.start, 2)
+        end_time = round(seg.end, 2)
+        if end_time - start_time < 1.0:
+            end_time = round(start_time + 1.2, 2)
 
-            timecode = f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
-            raw_cues.append({
-                "startTime": start_time,
-                "endTime": end_time,
-                "timecode": timecode,
-                "original": text
-            })
+        timecode = f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
+        raw_cues.append({
+            "startTime": start_time,
+            "endTime": end_time,
+            "timecode": timecode,
+            "original": text
+        })
 
-    # Translate concurrently for ultra-fast performance on long movies
-    def _translate_item(item):
-        orig_text = item["original"]
-        khmer = translator.translate_text(orig_text, source_lang=detected_lang, target_lang="km")
-        return {
-            "startTime": item["startTime"],
-            "endTime": item["endTime"],
-            "timecode": item["timecode"],
-            "original": orig_text,
+    # High-speed batch translation to authentic cinematic Khmer
+    orig_texts = [cue["original"] for cue in raw_cues]
+    khmer_translations = translator.translate_batch(orig_texts, source_lang=detected_lang, target_lang="km")
+
+    subtitles = []
+    for idx, (cue, khmer) in enumerate(zip(raw_cues, khmer_translations), 1):
+        subtitles.append({
+            "index": idx,
+            "startTime": cue["startTime"],
+            "endTime": cue["endTime"],
+            "timecode": cue["timecode"],
+            "original": cue["original"],
             "translated": khmer
-        }
-
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        subtitles = list(pool.map(_translate_item, raw_cues))
-
-    for idx, sub in enumerate(subtitles, 1):
-        sub["index"] = idx
-
-    return {
-        "success": True,
-        "duration": round(duration_sec, 2),
-        "language": detected_lang,
-        "subtitles": subtitles
-    }
+        })
 
     return {
         "success": True,
@@ -192,7 +179,7 @@ def main():
     parser.add_argument("--style", default="cinematic", choices=["cinematic", "action", "horror", "drama", "royal"])
     parser.add_argument("--bilingual", action="store_true", help="Output both Khmer and Original English in subtitles")
     parser.add_argument("--json", action="store_true", help="Print structured JSON result to stdout")
-    parser.add_argument("--model", default="tiny.en", help="Whisper model (tiny.en, base, small)")
+    parser.add_argument("--model", default="tiny", help="Whisper model (tiny, base, small)")
     parser.add_argument("--lang", default=None, help="Spoken language in video (en, zh, th, ja, etc. default: auto)")
 
     args = parser.parse_args()

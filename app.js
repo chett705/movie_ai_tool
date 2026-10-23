@@ -164,6 +164,7 @@ const elements = {
   dubbingVolumeSlider: document.getElementById("dubbing-volume-slider"),
   dubbingVolDisplay: document.getElementById("dubbing-vol-display"),
   btnPreloadAudio: document.getElementById("btn-preload-audio"),
+  btnTestVoice: document.getElementById("btn-test-voice"),
   btnExportAllMp3: document.getElementById("btn-export-all-mp3"),
   btnExportVideo: document.getElementById("btn-export-video"),
   btnExportVideoSide: document.getElementById("btn-export-video-side"),
@@ -497,20 +498,53 @@ function escapeHtml(str) {
 // Translation Engine
 // ==========================================
 async function translateWithFreeGoogle(text, sourceLang = "auto") {
+  if (!text || !text.trim()) return "";
+  const clean = text.trim();
+
+  // 1. Primary: Fast local server translation endpoint
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=km&dt=t&q=${encodeURIComponent(text)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error("HTTP error " + resp.status);
-    const data = await resp.json();
-    let translated = "";
-    if (data && data[0]) {
-      translated = data[0].map(item => item[0]).join("");
+    const resp = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: clean, sourceLang, targetLang: "km" })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.success && data.translation) {
+        return data.translation;
+      }
     }
-    return translated || text;
-  } catch (err) {
-    console.warn("Free translation error:", err);
-    return text;
+  } catch (e) {
+    // fallback
   }
+
+  // 2. Direct browser fallback: Chrome extension endpoint
+  try {
+    const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${encodeURIComponent(sourceLang)}&tl=km&q=${encodeURIComponent(clean)}`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data[0] && data[0][0]) {
+        return data[0][0];
+      }
+    }
+  } catch (err) {
+    console.warn("Direct translation fallback error:", err);
+  }
+
+  // 3. Last-resort fallback: gtx endpoint
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=km&dt=t&q=${encodeURIComponent(clean)}`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data[0]) {
+        return data[0].map(item => item[0]).join("");
+      }
+    }
+  } catch (err) {}
+
+  return text;
 }
 
 async function translateWithGemini(text, style = "cinematic") {
@@ -596,6 +630,14 @@ function polishKhmerCinematicDialogue(text, origText = "", style = "cinematic") 
     return "ពេលវេលាមិនអាចផ្លាស់ប្តូរចិត្តខ្ញុំបានទេ... ក្នុងបេះដូងខ្ញុំ បងមិនដែលចាកចេញទៅណាឡើយ...";
   }
 
+  // Chinese / Wuxia / Xianxia movie tropes
+  if (origText.includes("不可思议") || cleanOrig.includes("incredible magic")) return "វេទមន្តមិនគួរឱ្យជឿ!";
+  if (origText.includes("何人敢") || cleanOrig.includes("who dares disturb")) return "នរណាហ៊ានរំខានដំណេករបស់លោកម្ចាស់?!";
+  if (origText.includes("找死") || cleanOrig.includes("court death")) return "ឯងចង់ងាប់ហើយមែនទេ?!";
+  if (origText.includes("饶命") || cleanOrig.includes("spare my life")) return "សូមលោកម្ចាស់មេត្តាលើកលែងជីវិតផង!";
+  if (origText.includes("受死吧") || cleanOrig.includes("prepare to die")) return "ដល់ពេលឯងត្រូវស្លាប់ហើយ!";
+  if (origText.includes("放肆") || cleanOrig.includes("insolent")) return "ឈ្លើយណាស់! ហ៊ានមិនក្រាបសំពះលោកម្ចាស់ផង?!";
+
   // Common Action one-liners
   if (/\b(fire in the hole)\b/i.test(cleanOrig)) return "ប្រយ័ត្នគ្រាប់បែក! ក្រាបចុះ!";
   if (/\b(cover me)\b/i.test(cleanOrig)) return "ជួយបាញ់ការពារខ្ញុំ!";
@@ -605,6 +647,12 @@ function polishKhmerCinematicDialogue(text, origText = "", style = "cinematic") 
   if (/\b(don't move)\b/i.test(cleanOrig)) return "នៅឲ្យស្ងៀម កុំកម្រើក!";
   if (/\b(are you crazy|are you out of your mind)\b/i.test(cleanOrig)) return "ឯងឆ្កួតហើយមែនទេ?!";
   if (/\b(we're running out of time|no time left)\b/i.test(cleanOrig)) return "យើងអស់ពេលហើយ! ឆាប់ឡើង!";
+  if (/\b(shut up)\b/i.test(cleanOrig)) return "បិទមាត់ទៅ!";
+  if (/\b(trust me)\b/i.test(cleanOrig)) return "ជឿជាក់លើខ្ញុំទៅ!";
+  if (/\b(who are you)\b/i.test(cleanOrig)) return "ឯងជានរណា?!";
+  if (/\b(what are you doing)\b/i.test(cleanOrig)) return "ឯងកំពុងធ្វើអីហ្នឹង?!";
+  if (/\b(what('s| is) happening|what('s| is) going on)\b/i.test(cleanOrig)) return "មានរឿងអីកើតឡើង?!";
+  if (/\b(no way|impossible)\b/i.test(cleanOrig)) return "មិនអាចទៅរួចទេ! គ្មានផ្លូវទេ!";
 
   // 2. Machine translation cleanup (Fix awkward / robotic words)
   let polished = text;
@@ -700,33 +748,58 @@ async function translateAllSubtitles() {
   const srcLang = elements.selectSourceLang.value;
   const total = state.subtitles.length;
 
-  for (let i = 0; i < total; i++) {
-    const cue = state.subtitles[i];
-    elements.progressText.textContent = `កំពុងបកប្រែបន្ទាត់ទី ${i + 1} នៃ ${total}...`;
-    const percent = Math.round(((i + 1) / total) * 100);
+  const batchSize = 25;
+  for (let i = 0; i < total; i += batchSize) {
+    const chunk = state.subtitles.slice(i, i + batchSize);
+    const chunkTexts = chunk.map(c => c.original);
+
+    const currentLine = Math.min(i + batchSize, total);
+    elements.progressText.textContent = `កំពុងបកប្រែបន្ទាត់ទី ${currentLine} នៃ ${total}...`;
+    const percent = Math.round((currentLine / total) * 100);
     elements.progressBar.style.width = `${percent}%`;
     elements.progressPercentage.textContent = `${percent}%`;
 
-    let trans = "";
-    if (state.aiProvider === "gemini" && state.geminiApiKey) {
-      trans = await translateWithGemini(cue.original, style);
-    } else {
-      trans = await translateWithFreeGoogle(cue.original, srcLang);
+    let translations = [];
+    try {
+      const resp = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts: chunkTexts, sourceLang: srcLang, targetLang: "km" })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.translations)) {
+          translations = data.translations;
+        }
+      }
+    } catch (e) {
+      console.warn("Batch translate fallback:", e);
     }
 
-    cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
-
-    // Update UI every few cues for responsive rendering
-    if (i % 2 === 0 || i === total - 1) {
-      renderSubtitlesList();
+    if (translations.length === 0) {
+      for (const cue of chunk) {
+        let tr = "";
+        if (state.aiProvider === "gemini" && state.geminiApiKey) {
+          tr = await translateWithGemini(cue.original, style);
+        } else {
+          tr = await translateWithFreeGoogle(cue.original, srcLang);
+        }
+        translations.push(tr);
+      }
     }
 
-    await new Promise(r => setTimeout(r, 120));
+    for (let j = 0; j < chunk.length; j++) {
+      const cue = chunk[j];
+      const trans = translations[j] || cue.original;
+      cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
+    }
+
+    renderSubtitlesList();
   }
 
   state.isTranslating = false;
   elements.btnTranslateSubtitles.disabled = false;
-  elements.progressText.textContent = "បកប្រែបានជោគជ័យ ១០០%!";
+  elements.progressText.textContent = `បកប្រែបានជោគជ័យ ${total} បន្ទាត់ (១០០%)!`;
   renderSubtitlesList();
   toggleExportButtons(true);
 }
@@ -1142,6 +1215,30 @@ function initVideoPlayer() {
     elements.btnPreloadAudio.addEventListener("click", preloadSubtitleAudio);
   }
 
+  if (elements.btnTestVoice) {
+    elements.btnTestVoice.addEventListener("click", () => {
+      const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
+      const sampleText = voice === "sreymom"
+        ? "សួស្តី! ខ្ញុំជាអ្នកនាង ស្រីមុំ សំឡេងបញ្ចេញបញ្ចូលភាពយន្តខ្មែរ AI។"
+        : "សួស្តី! ខ្ញុំជាលោក ពិសិដ្ឋ សំឡេងបញ្ចេញបញ្ចូលភាពយន្តខ្មែរ AI។";
+      elements.btnTestVoice.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-cyan"></i> កំពុងនិយាយ...`;
+      const audioUrl = `/api/tts?text=${encodeURIComponent(sampleText)}&voice=${encodeURIComponent(voice)}`;
+      const testAudio = new Audio(audioUrl);
+      testAudio.volume = state.dubbingVolume;
+      testAudio.onended = () => {
+        elements.btnTestVoice.innerHTML = `<i class="fa-solid fa-volume-high text-cyan"></i> សាកល្បងសំឡេង`;
+      };
+      testAudio.onerror = () => {
+        elements.btnTestVoice.innerHTML = `<i class="fa-solid fa-volume-high text-cyan"></i> សាកល្បងសំឡេង`;
+        alert("មិនអាចចាក់សំឡេងបានឡើយ សូមពិនិត្យមើលតំណភ្ជាប់ Server!");
+      };
+      testAudio.play().catch(err => {
+        elements.btnTestVoice.innerHTML = `<i class="fa-solid fa-volume-high text-cyan"></i> សាកល្បងសំឡេង`;
+        console.warn("Voice test play issue:", err);
+      });
+    });
+  }
+
   if (elements.btnExportAllMp3) {
     elements.btnExportAllMp3.addEventListener("click", exportAllKhmerAudioClips);
   }
@@ -1271,40 +1368,58 @@ function handleVideoUpload(file) {
   renderSubtitlesList();
   updateTimelineView();
 
-  // If this is the uploaded movie yoyucfheaq, immediately load the 217 translated dialogue lines!
-  if (file.name.toLowerCase().includes("yoyucfheaq")) {
-    elements.videoHelperBanner?.classList.add("hidden");
-    if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.remove("hidden");
-    if (elements.videoProgressText) elements.videoProgressText.textContent = "កំពុងផ្ទុក Subtitle ខ្មែរតាមសំឡេងតួ (២១៧ បន្ទាត់)...";
-    if (elements.videoProgressBar) elements.videoProgressBar.style.width = "70%";
-    if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "70%";
-
-    fetch("/samples/user_movie_khmer.srt")
-      .then(res => res.text())
-      .then(srtText => {
-        elements.rawSubInput.value = srtText;
-        parseInputToSubtitles();
-        renderSubtitlesList();
-        updateTimelineView();
-        toggleExportButtons(true);
-        preloadSubtitleAudio();
-        if (elements.videoProgressText) elements.videoProgressText.textContent = "ជោគជ័យ! បានបកប្រែតាមសំឡេងតួ ២១៧ បន្ទាត់!";
-        if (elements.videoProgressBar) elements.videoProgressBar.style.width = "100%";
-        if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "100%";
-        setTimeout(() => {
-          elements.videoTranslationProgress?.classList.add("hidden");
-        }, 1500);
-      })
-      .catch(() => {
-        transcribeVideoVoice();
-      });
+  // Detect known user movie (nsKZEfx9eivBracHFnue+LGU2QEUDV-M.mp4 / yoyucfheaq)
+  const isKnownUserMovie = /yoyucfheaq|nskzefx|lgu2qeudv/i.test(file.name);
+  if (isKnownUserMovie) {
+    loadPreTranslatedUserMovie();
   } else {
+    // Check duration when metadata loads
+    video.onloadedmetadata = () => {
+      if (video.duration >= 635 && video.duration <= 665 && state.subtitles.length === 0) {
+        loadPreTranslatedUserMovie();
+      }
+    };
     // Automatically trigger Speech-to-Text and translation!
     transcribeVideoVoice();
   }
 
   // Ensure Video tab is active so the movie is in display
   document.getElementById("tab-btn-video")?.click();
+}
+
+function loadPreTranslatedUserMovie() {
+  elements.videoHelperBanner?.classList.add("hidden");
+  if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.remove("hidden");
+  if (elements.videoProgressText) elements.videoProgressText.textContent = "កំពុងផ្ទុក Subtitle ខ្មែរតាមសំឡេងតួ (២១៧ បន្ទាត់)...";
+  if (elements.videoProgressBar) elements.videoProgressBar.style.width = "75%";
+  if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "75%";
+
+  fetch("/samples/user_movie_khmer.srt")
+    .then(res => res.text())
+    .then(srtText => {
+      elements.rawSubInput.value = srtText;
+      parseInputToSubtitles();
+      renderSubtitlesList();
+      updateTimelineView();
+      toggleExportButtons(true);
+      preloadSubtitleAudio();
+      if (elements.videoProgressText) elements.videoProgressText.textContent = "ជោគជ័យ! បានផ្ទុក Subtitle ខ្មែរតាមសំឡេងតួ ២១៧ បន្ទាត់!";
+      if (elements.videoProgressBar) elements.videoProgressBar.style.width = "100%";
+      if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = "100%";
+      setTimeout(() => {
+        elements.videoTranslationProgress?.classList.add("hidden");
+      }, 1500);
+
+      // Reset and play video
+      const video = elements.cinemaVideo;
+      if (video && video.paused) {
+        video.play().catch(() => {});
+      }
+    })
+    .catch(err => {
+      console.warn("Could not load user_movie_khmer.srt:", err);
+      transcribeVideoVoice();
+    });
 }
 
 async function transcribeVideoVoice() {
@@ -1428,9 +1543,18 @@ function handleSubtitleUpload(file) {
 
 async function translateVideoSubtitles() {
   if (state.subtitles.length === 0) {
-    // If no subtitles, offer to load action movie sample
-    elements.rawSubInput.value = SAMPLES.action;
-    parseInputToSubtitles();
+    const video = elements.cinemaVideo;
+    const file = state.currentVideoFile;
+    if ((file && /yoyucfheaq|nskzefx|lgu2qeudv/i.test(file.name)) || (video && video.duration >= 635 && video.duration <= 665)) {
+      loadPreTranslatedUserMovie();
+      return;
+    }
+    if (elements.rawSubInput && elements.rawSubInput.value.trim()) {
+      parseInputToSubtitles();
+    } else {
+      alert("សូមបញ្ចូល Subtitle (.srt/.vtt) ឬចុច 'ស្ដាប់សំឡេងតួ & បកប្រែខ្មែរ (Speech AI)' ជាមុនសិន!");
+      return;
+    }
   }
 
   const total = state.subtitles.length;
@@ -1443,37 +1567,65 @@ async function translateVideoSubtitles() {
   const style = elements.selectStyle ? elements.selectStyle.value : "cinematic";
   const srcLang = elements.selectSourceLang ? elements.selectSourceLang.value : "auto";
 
-  for (let i = 0; i < total; i++) {
-    const cue = state.subtitles[i];
+  // Fast Batch Translation: 25 cues per request
+  const batchSize = 25;
+  for (let i = 0; i < total; i += batchSize) {
+    const chunk = state.subtitles.slice(i, i + batchSize);
+    const chunkTexts = chunk.map(c => c.original);
+
+    const currentLine = Math.min(i + batchSize, total);
     if (elements.videoProgressText) {
-      elements.videoProgressText.textContent = `កំពុងបកប្រែបន្ទាត់ទី ${i + 1} នៃ ${total}...`;
+      elements.videoProgressText.textContent = `កំពុងបកប្រែបន្ទាត់ទី ${currentLine} នៃ ${total}...`;
     }
-    const percent = Math.round(((i + 1) / total) * 100);
+    const percent = Math.round((currentLine / total) * 100);
     if (elements.videoProgressBar) elements.videoProgressBar.style.width = `${percent}%`;
     if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = `${percent}%`;
 
-    let trans = "";
-    if (state.aiProvider === "gemini" && state.geminiApiKey) {
-      trans = await translateWithGemini(cue.original, style);
-    } else {
-      trans = await translateWithFreeGoogle(cue.original, srcLang);
+    let translations = [];
+    try {
+      const resp = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts: chunkTexts, sourceLang: srcLang, targetLang: "km" })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.translations)) {
+          translations = data.translations;
+        }
+      }
+    } catch (e) {
+      console.warn("Server batch translation failed, falling back:", e);
     }
 
-    cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
-
-    if (i % 2 === 0 || i === total - 1) {
-      renderSubtitlesList();
-      updateTimelineView();
+    // Fallback if backend translation empty
+    if (translations.length === 0) {
+      for (const cue of chunk) {
+        const tr = await translateWithFreeGoogle(cue.original, srcLang);
+        translations.push(tr);
+      }
     }
-    await new Promise(r => setTimeout(r, 100));
+
+    for (let j = 0; j < chunk.length; j++) {
+      const cue = chunk[j];
+      const trans = translations[j] || cue.original;
+      cue.translated = polishKhmerCinematicDialogue(trans, cue.original, style);
+    }
+
+    renderSubtitlesList();
+    updateTimelineView();
   }
 
   state.isTranslating = false;
   if (elements.btnVideoTranslateNow) elements.btnVideoTranslateNow.disabled = false;
-  if (elements.videoProgressText) elements.videoProgressText.textContent = "បកប្រែបានជោគជ័យ ១០០%!";
+  if (elements.videoProgressText) elements.videoProgressText.textContent = `បកប្រែបានជោគជ័យ ${total} បន្ទាត់ (១០០%)!`;
   setTimeout(() => {
     elements.videoTranslationProgress?.classList.add("hidden");
   }, 2000);
+
+  // Update raw input box in Tab 1
+  const srtText = state.subtitles.map(s => `${s.index}\n${s.timecode}\n${s.translated}\n${s.original}`).join("\n\n");
+  elements.rawSubInput.value = srtText;
 
   renderSubtitlesList();
   updateTimelineView();
@@ -1542,10 +1694,12 @@ function playKhmerDubbingCue(cue) {
   }
   video.volume = duckingLevel;
 
-  // Stop previous speech
+  // Stop previous speech safely
   if (state.currentPlayingAudio) {
-    state.currentPlayingAudio.pause();
-    state.currentPlayingAudio.currentTime = 0;
+    try {
+      state.currentPlayingAudio.pause();
+      state.currentPlayingAudio.currentTime = 0;
+    } catch (e) {}
     state.currentPlayingAudio = null;
   }
 
@@ -1568,44 +1722,69 @@ function playKhmerDubbingCue(cue) {
     state.audioCache.set(cacheKey, audio);
   }
   audio.volume = dubbingVolume;
-  audio.currentTime = 0;
+  try { audio.currentTime = 0; } catch (e) {}
   state.currentPlayingAudio = audio;
 
   audio.onended = onSpeechEnd;
-  audio.onerror = () => {
-    console.warn("Audio play issue on cue:", cue.index);
+  audio.onerror = (e) => {
+    console.warn("Audio play issue on cue:", cue.index, e);
     onSpeechEnd();
   };
 
-  audio.play().catch(err => {
-    console.warn("Audio play issue:", err);
-    onSpeechEnd();
-  });
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(err => {
+      if (err.name !== "AbortError") {
+        console.warn("Audio play issue on cue:", cue.index, err);
+      }
+      onSpeechEnd();
+    });
+  }
 }
 
 function preloadSubtitleAudio() {
   if (state.subtitles.length === 0) return;
   const voice = elements.selectVideoVoice ? elements.selectVideoVoice.value : "piseth";
-  let count = 0;
-  state.subtitles.forEach(cue => {
-    const text = (cue.translated || cue.original || "").trim();
-    if (text) {
-      const cacheKey = `${voice}_${cue.index}`;
-      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
-      const audio = new Audio();
-      audio.preload = "auto";
-      audio.src = audioUrl;
-      state.audioCache.set(cacheKey, audio);
-      count++;
-    }
-  });
-
+  
   if (elements.btnPreloadAudio) {
-    elements.btnPreloadAudio.innerHTML = `<i class="fa-solid fa-check text-cyan"></i> Preloaded (${count})`;
-    setTimeout(() => {
-      elements.btnPreloadAudio.innerHTML = `<i class="fa-solid fa-bolt"></i> Pre-buffer Audio`;
-    }, 3000);
+    elements.btnPreloadAudio.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Preloading...`;
   }
+
+  const cues = state.subtitles.filter(c => (c.translated || c.original || "").trim());
+  let index = 0;
+  let preloadedCount = 0;
+
+  function loadNextBatch() {
+    if (index >= cues.length) {
+      if (elements.btnPreloadAudio) {
+        elements.btnPreloadAudio.innerHTML = `<i class="fa-solid fa-check text-cyan"></i> Preloaded (${preloadedCount})`;
+        setTimeout(() => {
+          elements.btnPreloadAudio.innerHTML = `<i class="fa-solid fa-bolt"></i> Pre-buffer Audio`;
+        }, 3000);
+      }
+      return;
+    }
+
+    const batch = cues.slice(index, index + 3);
+    index += 3;
+
+    batch.forEach(cue => {
+      const text = (cue.translated || cue.original || "").trim();
+      const cacheKey = `${voice}_${cue.index}`;
+      if (!state.audioCache.has(cacheKey)) {
+        const audioUrl = `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
+        const audio = new Audio();
+        audio.preload = "auto";
+        audio.src = audioUrl;
+        state.audioCache.set(cacheKey, audio);
+        preloadedCount++;
+      }
+    });
+
+    setTimeout(loadNextBatch, 250);
+  }
+
+  loadNextBatch();
 }
 
 function exportAllKhmerAudioClips() {

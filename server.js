@@ -3,6 +3,28 @@ const fs = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
 const crypto = require("crypto");
+const os = require("os");
+
+function getPythonBin() {
+  if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+  const venvPyWin = path.join(__dirname, ".venv", "Scripts", "python.exe");
+  if (fs.existsSync(venvPyWin)) return venvPyWin;
+  const venvPyUnix = path.join(__dirname, ".venv", "bin", "python");
+  if (fs.existsSync(venvPyUnix)) return venvPyUnix;
+  return process.platform === "win32" ? "python" : "python3";
+}
+
+function getLocalIp() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return "localhost";
+}
 
 const PORT = process.env.PORT || 3000;
 const BASE_DIR = __dirname;
@@ -29,6 +51,34 @@ const MIME_TYPES = {
   ".mp3": "audio/mpeg"
 };
 
+// Concurrency-limited and in-flight deduplicated TTS generation queue
+const inFlightTTS = new Map();
+const ttsQueue = [];
+let activeTTSCount = 0;
+const MAX_CONCURRENT_TTS = 3;
+
+function enqueueTTS(cleanText, cachedFilePath, voice, callback) {
+  ttsQueue.push({ cleanText, cachedFilePath, voice, callback });
+  processTTSQueue();
+}
+
+function processTTSQueue() {
+  if (activeTTSCount >= MAX_CONCURRENT_TTS || ttsQueue.length === 0) return;
+  const item = ttsQueue.shift();
+  activeTTSCount++;
+
+  const helperScript = path.join(BASE_DIR, "tts_helper.py");
+  execFile(getPythonBin(), [helperScript, item.cleanText, item.cachedFilePath, item.voice], { timeout: 35000 }, (error, stdout, stderr) => {
+    activeTTSCount--;
+    try {
+      item.callback(error, stderr);
+    } catch (e) {
+      console.error("[TTS Callback Error]:", e);
+    }
+    processTTSQueue();
+  });
+}
+
 const server = http.createServer((req, res) => {
   let reqPath = decodeURI(req.url.split("?")[0]);
 
@@ -40,6 +90,77 @@ const server = http.createServer((req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(200);
     res.end();
+    return;
+  }
+
+  // API Endpoint: High-Speed Batch Translation to Khmer
+  // POST /api/translate
+  if (reqPath === "/api/translate" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", async () => {
+      try {
+        const payload = JSON.parse(body || "{}");
+        const { texts, text, sourceLang = "auto", targetLang = "km" } = payload;
+
+        const https = require("https");
+        const translateBatchNode = async (lines, sl, tl) => {
+          if (!lines || lines.length === 0) return [];
+          const cleaned = lines.map(l => (l || "").replace(/[\r\n]+/g, " ").trim());
+          const joined = cleaned.map(l => l || "...").join("\n");
+          
+          return new Promise((resolve) => {
+            const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(joined)}`;
+            const gReq = https.get(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }, timeout: 15000 }, (resp) => {
+              let data = "";
+              resp.on("data", c => data += c);
+              resp.on("end", () => {
+                try {
+                  const json = JSON.parse(data);
+                  if (Array.isArray(json) && json[0] && json[0][0]) {
+                    const transLines = json[0][0].split("\n");
+                    while (transLines.length < lines.length) transLines.push(lines[transLines.length]);
+                    resolve(transLines.slice(0, lines.length));
+                  } else {
+                    resolve(lines);
+                  }
+                } catch (e) {
+                  resolve(lines);
+                }
+              });
+            });
+            gReq.on("error", () => resolve(lines));
+            gReq.on("timeout", () => { gReq.destroy(); resolve(lines); });
+          });
+        };
+
+        if (Array.isArray(texts)) {
+          const batchSize = 25;
+          const translatedAll = [];
+          for (let i = 0; i < texts.length; i += batchSize) {
+            const chunk = texts.slice(i, i + batchSize);
+            const chunkRes = await translateBatchNode(chunk, sourceLang, targetLang);
+            translatedAll.push(...chunkRes);
+          }
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ success: true, translations: translatedAll }));
+          return;
+        }
+
+        if (text) {
+          const resLines = await translateBatchNode([text], sourceLang, targetLang);
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ success: true, translation: resLines[0] || text }));
+          return;
+        }
+
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ success: false, error: "Missing texts or text parameter" }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 
@@ -80,22 +201,42 @@ const server = http.createServer((req, res) => {
       });
     };
 
-    // If already generated and cached, stream immediately
-    if (fs.existsSync(cachedFilePath) && fs.statSync(cachedFilePath).size > 0) {
+    // If already generated and cached (>100 bytes), stream immediately
+    if (fs.existsSync(cachedFilePath) && fs.statSync(cachedFilePath).size > 100) {
       streamAudio(cachedFilePath);
       return;
     }
 
-    // Otherwise, generate audio using native Khmer Neural engine (tts_helper.py)
-    const helperScript = path.join(BASE_DIR, "tts_helper.py");
-    execFile("python", [helperScript, cleanText, cachedFilePath, voice], { timeout: 25000 }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("[TTS Generation Error]:", error, stderr);
+    // If generation in flight for this exact text/voice, wait for it
+    if (inFlightTTS.has(hash)) {
+      inFlightTTS.get(hash).push((err) => {
+        if (err) {
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("TTS Generation Error: " + err);
+        } else {
+          streamAudio(cachedFilePath);
+        }
+      });
+      return;
+    }
+
+    inFlightTTS.set(hash, [(err) => {
+      if (err) {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("TTS Generation Error: " + (stderr || error.message));
-        return;
+        res.end("TTS Generation Error: " + err);
+      } else {
+        streamAudio(cachedFilePath);
       }
-      streamAudio(cachedFilePath);
+    }]);
+
+    enqueueTTS(cleanText, cachedFilePath, voice, (error, stderr) => {
+      const callbacks = inFlightTTS.get(hash) || [];
+      inFlightTTS.delete(hash);
+
+      const errMessage = error ? (stderr || error.message) : null;
+      callbacks.forEach(cb => {
+        try { cb(errMessage); } catch (e) {}
+      });
     });
     return;
   }
@@ -126,9 +267,9 @@ const server = http.createServer((req, res) => {
 
     writeStream.on("finish", () => {
       const transcriberScript = path.join(BASE_DIR, "video_transcriber.py");
-      const args = [transcriberScript, "--input", tempFile, "--style", style, "--json"];
+      const args = [transcriberScript, "--input", tempFile, "--style", style, "--model", "tiny", "--json"];
 
-      execFile("python", args, { timeout: 600000, maxBuffer: 30 * 1024 * 1024 }, (error, stdout, stderr) => {
+      execFile(getPythonBin(), args, { timeout: 600000, maxBuffer: 30 * 1024 * 1024 }, (error, stdout, stderr) => {
         // Clean up temporary uploaded file
         fs.unlink(tempFile, () => {});
 
@@ -224,7 +365,7 @@ const server = http.createServer((req, res) => {
           "--ducking", String(ducking || 0.20)
         ];
 
-        execFile("python", args, { timeout: 600000 }, (error, stdout, stderr) => {
+        execFile(getPythonBin(), args, { timeout: 600000 }, (error, stdout, stderr) => {
           fs.unlink(tempSrt, () => {});
 
           if (error) {
@@ -288,12 +429,14 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
+  const localIp = getLocalIp();
   console.log(`\n======================================================`);
   console.log(`🎬 CineKhmer AI Studio running at:`);
-  console.log(`👉 http://localhost:${PORT}`);
+  console.log(`👉 This PC:   http://localhost:${PORT}`);
+  console.log(`👉 Other PCs:  http://${localIp}:${PORT} (same Wi-Fi / LAN)`);
   console.log(`🎙️ Native Neural Khmer TTS API:`);
-  console.log(`   - Male (Piseth):  http://localhost:${PORT}/api/tts?text=សួស្តី&voice=piseth`);
-  console.log(`   - Female (Sreymom): http://localhost:${PORT}/api/tts?text=សួស្តី&voice=sreymom`);
+  console.log(`   - Male (Piseth):    http://localhost:${PORT}/api/tts?text=សួស្តី&voice=piseth`);
+  console.log(`   - Female (Sreymom):  http://localhost:${PORT}/api/tts?text=សួស្តី&voice=sreymom`);
   console.log(`======================================================\n`);
 });

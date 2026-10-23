@@ -54,6 +54,10 @@ class MovieAiTranslator:
         return text
 
     def apply_glossary_post(self, text):
+        if not text or not self.glossary:
+            return text
+        for pattern, replacement in self.glossary.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
         return text
 
     def translate_text(self, text, source_lang="en", target_lang="km"):
@@ -67,7 +71,23 @@ class MovieAiTranslator:
             return self._translate_with_free_api(text, source_lang, target_lang)
 
     def _translate_with_free_api(self, text, source_lang="auto", target_lang="km"):
-        """Free Google Translate endpoint with movie phrasing optimizations."""
+        """Fast Google Translate endpoint with movie phrasing optimizations."""
+        # 1. Primary: Google Chrome extension endpoint (fast, reliable, no 429 captcha block)
+        try:
+            url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q={urllib.parse.quote(text)}"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
+                    translated = data[0][0]
+                    return self._polish_khmer_movie_style(translated, orig_text=text, style=self.style)
+        except Exception:
+            pass
+
+        # 2. Secondary fallback: Google single endpoint
         try:
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={urllib.parse.quote(text)}"
             req = urllib.request.Request(
@@ -81,6 +101,49 @@ class MovieAiTranslator:
         except Exception as e:
             print(f"[Warning] Translation error on '{text}': {e}", file=sys.stderr)
             return text
+
+    def translate_batch(self, texts, source_lang="auto", target_lang="km", batch_size=25):
+        """Translates a list of dialogue texts in fast chunks, preserving 1:1 order."""
+        if not texts:
+            return []
+
+        results = []
+        for i in range(0, len(texts), batch_size):
+            chunk = texts[i:i + batch_size]
+            cleaned_chunk = [t.replace("\r", " ").replace("\n", " ").strip() for t in chunk]
+            joined = "\n".join([t if t else "..." for t in cleaned_chunk])
+
+            translated_lines = []
+            try:
+                url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q={urllib.parse.quote(joined)}"
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
+                        raw_trans = data[0][0]
+                        translated_lines = raw_trans.split("\n")
+            except Exception as e:
+                print(f"[Batch translation error]: {e}", file=sys.stderr)
+                translated_lines = [self.translate_text(t, source_lang, target_lang) for t in chunk]
+
+            # Ensure 1:1 line alignment
+            while len(translated_lines) < len(chunk):
+                idx = len(translated_lines)
+                translated_lines.append(self.translate_text(chunk[idx], source_lang, target_lang))
+
+            for orig, trans in zip(chunk, translated_lines[:len(chunk)]):
+                if not orig.strip():
+                    results.append("")
+                else:
+                    results.append(self._polish_khmer_movie_style(trans, orig_text=orig, style=self.style))
+
+            if i + batch_size < len(texts):
+                time.sleep(0.1)
+
+        return results
 
     def _translate_with_gemini(self, text):
         """High-context cinematic translation using Gemini API."""
@@ -155,7 +218,21 @@ class MovieAiTranslator:
         if "time didn't change anything" in clean_orig and "never left" in clean_orig:
             return "ពេលវេលាមិនអាចផ្លាស់ប្តូរចិត្តខ្ញុំបានទេ... ក្នុងបេះដូងខ្ញុំ បងមិនដែលចាកចេញទៅណាឡើយ..."
 
-        # Common action one-liners
+        # Chinese / Wuxia / Xianxia movie tropes
+        if "不可思议" in orig_text or "incredible magic" in clean_orig:
+            return "វេទមន្តមិនគួរឱ្យជឿ!"
+        if "何人敢" in orig_text or "who dares disturb" in clean_orig:
+            return "នរណាហ៊ានរំខានដំណេករបស់លោកម្ចាស់?!"
+        if "找死" in orig_text or "court death" in clean_orig:
+            return "ឯងចង់ងាប់ហើយមែនទេ?!"
+        if "饶命" in orig_text or "spare my life" in clean_orig:
+            return "សូមលោកម្ចាស់មេត្តាលើកលែងជីវិតផង!"
+        if "受死吧" in orig_text or "prepare to die" in clean_orig:
+            return "ដល់ពេលឯងត្រូវស្លាប់ហើយ!"
+        if "放肆" in orig_text or "insolent" in clean_orig:
+            return "ឈ្លើយណាស់! ហ៊ានមិនក្រាបសំពះលោកម្ចាស់ផង?!"
+
+        # Common action & Hollywood one-liners
         if re.search(r"\b(fire in the hole)\b", clean_orig):
             return "ប្រយ័ត្នគ្រាប់បែក! ក្រាបចុះ!"
         if re.search(r"\b(cover me)\b", clean_orig):
@@ -172,6 +249,18 @@ class MovieAiTranslator:
             return "ឯងឆ្កួតហើយមែនទេ?!"
         if re.search(r"\b(we're running out of time|no time left)\b", clean_orig):
             return "យើងអស់ពេលហើយ! ឆាប់ឡើង!"
+        if re.search(r"\b(shut up)\b", clean_orig):
+            return "បិទមាត់ទៅ!"
+        if re.search(r"\b(trust me)\b", clean_orig):
+            return "ជឿជាក់លើខ្ញុំទៅ!"
+        if re.search(r"\b(who are you)\b", clean_orig):
+            return "ឯងជានរណា?!"
+        if re.search(r"\b(what are you doing)\b", clean_orig):
+            return "ឯងកំពុងធ្វើអីហ្នឹង?!"
+        if re.search(r"\b(what('s| is) happening|what('s| is) going on)\b", clean_orig):
+            return "មានរឿងអីកើតឡើង?!"
+        if re.search(r"\b(no way|impossible)\b", clean_orig):
+            return "មិនអាចទៅរួចទេ! គ្មានផ្លូវទេ!"
 
         # 2. General dialogue idiom cleanup (Fix awkward machine translation)
         # Fix breach -> rape
@@ -201,15 +290,20 @@ class MovieAiTranslator:
         if clean_orig and re.search(r"\b(commander|captain|sir)\b", clean_orig):
             text = text.replace("លោកម្ចាស់", "លោកមេបញ្ជាការ")
             text = text.replace("ព្រះអម្ចាស់", "លោកមេបញ្ជាការ")
-        elif "លោកម្ចាស់" in text:
-            text = text.replace("លោកម្ចាស់", "លោកមេ")
+        elif "លោកម្ចាស់" in text and style != "royal":
+            # In martial arts/wuxia, keep លោកម្ចាស់ / ចៅហ្វាយ, in modern movies replace with លោកមេ
+            if not ("វេទមន្ត" in text or "បិសាច" in text or "វិជ្ជា" in text):
+                text = text.replace("លោកម្ចាស់", "លោកមេ")
 
         # Conversational flow fixes (clean up robotic 'ពួកយើងបាន' -> 'យើង')
         text = text.replace("ពួកយើងបាន", "យើង")
         text = text.replace("ពួកយើង", "យើង")
         text = text.replace("ពួកគេបាន", "ពួកវា")
 
-        text = text.replace(" ! ", "! ").replace(" ? ", "? ").strip()
+        # Apply Glossary
+        text = self.apply_glossary_post(text)
+
+        text = re.sub(r"\s*!\s*", "! ", text).replace(" ? ", "? ").strip()
         return text
 
     def parse_srt(self, content):
@@ -246,19 +340,19 @@ class MovieAiTranslator:
         return "\n".join(out)
 
     def translate_srt_file(self, srt_content, bilingual=False):
-        """Translates an entire SRT content."""
+        """Translates an entire SRT content at high speed using batching."""
         subs = self.parse_srt(srt_content)
         total = len(subs)
-        print(f"[*] Found {total} subtitle cues. Starting translation to Khmer ({self.style} style)...")
+        print(f"[*] Found {total} subtitle cues. Starting batch translation to Khmer ({self.style} style)...")
 
-        for idx, sub in enumerate(subs, 1):
-            orig = sub["text"]
-            translated = self.translate_text(orig)
+        orig_texts = [sub["text"] for sub in subs]
+        translated_texts = self.translate_batch(orig_texts, target_lang="km", batch_size=25)
+
+        for idx, (sub, orig, trans) in enumerate(zip(subs, orig_texts, translated_texts), 1):
             sub["original"] = orig
-            sub["text"] = translated
-            print(f"[{idx}/{total}] {orig} -> {translated}")
-            time.sleep(0.15)  # Friendly pacing
+            sub["text"] = trans
 
+        print(f"[✔] Successfully batch translated {total} cues to Khmer!")
         return self.generate_srt(subs, bilingual=bilingual)
 
     def generate_movie_recap_script(self, plot_text, duration_mins=3):
