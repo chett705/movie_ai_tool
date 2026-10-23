@@ -404,17 +404,49 @@
 
           <div class="video-source-bar">
             <div class="source-left">
-              <label for="video-file-input" class="btn-cinema-sm">
-                <i class="fa-solid fa-upload"></i> ជ្រើសរើសវីដេអូពីកុំព្យូទ័រ (.mp4/.webm)
+              <label for="video-file-input" class="btn-accent-sm">
+                <i class="fa-solid fa-film text-cyan"></i> ជ្រើសរើសវីដេអូ (.mp4/.webm)
               </label>
-              <input type="file" id="video-file-input" accept="video/mp4,video/webm" class="hidden">
+              <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/mkv,video/quicktime" class="hidden">
+              
+              <label for="video-srt-input" class="btn-accent-sm">
+                <i class="fa-solid fa-closed-captioning text-gold"></i> បញ្ចូល Subtitle (.srt/.vtt)
+              </label>
+              <input type="file" id="video-srt-input" accept=".srt,.vtt,.txt" class="hidden">
+
+              <button id="btn-video-translate-now" class="btn-cinema-sm" title="បកប្រែ Subtitle ភាពយន្តជាភាសាខ្មែរ">
+                <i class="fa-solid fa-language text-cyan"></i> បកប្រែជាភាសាខ្មែរ (Translate)
+              </button>
+
               <button id="btn-load-demo-video" class="btn-cinema-sm">
-                <i class="fa-solid fa-clapperboard"></i> ប្រើវីដេអូគំរូ (Cinema Canvas Simulator)
+                <i class="fa-solid fa-clapperboard"></i> វីដេអូគំរូ (Demo)
               </button>
             </div>
             <div class="source-right">
               <span id="video-filename" class="tag-file">វីដេអូ៖ Demo Simulation Video</span>
             </div>
+          </div>
+
+          <!-- Video Tab Translation Progress -->
+          <div id="video-translation-progress" class="progress-wrap hidden">
+            <div class="progress-meta">
+              <span id="video-progress-text">កំពុងបកប្រែភាពយន្តជាភាសាខ្មែរ...</span>
+              <span id="video-progress-percentage">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="video-progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Helper Banner when user uploads video -->
+          <div id="video-helper-banner" class="video-helper-box hidden">
+            <div class="helper-content">
+              <i class="fa-solid fa-circle-info text-cyan"></i>
+              <span>បានបង្ហាញវីដេអូលើ Display! សូមបញ្ចូលឯកសារ <strong>Subtitle (.srt)</strong> ឬចុច <strong>ប្រើ Subtitle គំរូ</strong> ដើម្បីឲ្យ AI បកប្រែ និងនិយាយខ្មែរតាមវីដេអូ។</span>
+            </div>
+            <button id="btn-video-use-sample" class="btn-cinema-sm">
+              <i class="fa-solid fa-wand-magic-sparkles text-gold"></i> ប្រើ Subtitle គំរូ & បកប្រែភ្លាម
+            </button>
           </div>
         </div>
 

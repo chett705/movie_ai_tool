@@ -139,10 +139,17 @@ const elements = {
   
   // Tab 3: Video
   cinemaVideo: document.getElementById("cinema-video"),
-  videoWrapper: document.getElementById("video-wrapper"),
   videoFileInput: document.getElementById("video-file-input"),
+  videoSrtInput: document.getElementById("video-srt-input"),
+  btnVideoTranslateNow: document.getElementById("btn-video-translate-now"),
   btnLoadDemoVideo: document.getElementById("btn-load-demo-video"),
   videoFilename: document.getElementById("video-filename"),
+  videoTranslationProgress: document.getElementById("video-translation-progress"),
+  videoProgressBar: document.getElementById("video-progress-bar"),
+  videoProgressText: document.getElementById("video-progress-text"),
+  videoProgressPercentage: document.getElementById("video-progress-percentage"),
+  videoHelperBanner: document.getElementById("video-helper-banner"),
+  btnVideoUseSample: document.getElementById("btn-video-use-sample"),
   toggleBilingualPreview: document.getElementById("toggle-bilingual-preview"),
   toggleKhmerDubbing: document.getElementById("toggle-khmer-dubbing"),
   dubbingLiveBadge: document.getElementById("dubbing-live-badge"),
@@ -772,19 +779,39 @@ function initVideoPlayer() {
   });
 
   // Load custom video file from file input
-  elements.videoFileInput.addEventListener("change", (e) => {
-    if (e.target.files.length > 0) {
+  elements.videoFileInput?.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
       handleVideoUpload(e.target.files[0]);
     }
   });
 
-  // Drag and drop video directly onto the video player container
+  // Load subtitle file directly from video tab
+  elements.videoSrtInput?.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleSubtitleUpload(e.target.files[0]);
+    }
+  });
+
+  // Translate video subtitles button on video tab
+  elements.btnVideoTranslateNow?.addEventListener("click", () => {
+    translateVideoSubtitles();
+  });
+
+  // Helper banner button: Use sample & translate immediately
+  elements.btnVideoUseSample?.addEventListener("click", () => {
+    elements.rawSubInput.value = SAMPLES.action;
+    parseInputToSubtitles();
+    elements.videoHelperBanner?.classList.add("hidden");
+    translateVideoSubtitles();
+  });
+
+  // Drag and drop video OR subtitle file directly onto the video player container
   const wrapper = elements.videoWrapper;
   if (wrapper) {
     wrapper.addEventListener("dragover", (e) => {
       e.preventDefault();
       wrapper.style.borderColor = "var(--cyan-primary)";
-      wrapper.style.boxShadow = "0 0 30px rgba(6, 182, 212, 0.4)";
+      wrapper.style.boxShadow = "0 0 35px rgba(6, 182, 212, 0.5)";
     });
     wrapper.addEventListener("dragleave", (e) => {
       e.preventDefault();
@@ -796,10 +823,12 @@ function initVideoPlayer() {
       wrapper.style.borderColor = "";
       wrapper.style.boxShadow = "";
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files[0];
-        if (file.type.startsWith("video/") || file.name.match(/\.(mp4|webm|mkv|mov)$/i)) {
-          handleVideoUpload(file);
-        }
+        const files = Array.from(e.dataTransfer.files);
+        const videoFile = files.find(f => f.type.startsWith("video/") || f.name.match(/\.(mp4|webm|mkv|mov)$/i));
+        const srtFile = files.find(f => f.name.match(/\.(srt|vtt|txt)$/i));
+
+        if (videoFile) handleVideoUpload(videoFile);
+        if (srtFile) handleSubtitleUpload(srtFile);
       }
     });
   }
@@ -819,12 +848,6 @@ function initVideoPlayer() {
     });
   }
 
-  if (elements.selectTtsEngine) {
-    elements.selectTtsEngine.addEventListener("change", (e) => {
-      state.ttsEngine = e.target.value;
-    });
-  }
-
   if (elements.btnPreloadAudio) {
     elements.btnPreloadAudio.addEventListener("click", preloadSubtitleAudio);
   }
@@ -834,7 +857,7 @@ function initVideoPlayer() {
   }
 
   // Load animated canvas demo simulator
-  elements.btnLoadDemoVideo.addEventListener("click", () => {
+  elements.btnLoadDemoVideo?.addEventListener("click", () => {
     startDemoCanvasVideo();
   });
 
@@ -843,6 +866,13 @@ function initVideoPlayer() {
 }
 
 function startDemoCanvasVideo() {
+  const video = elements.cinemaVideo;
+  if (!video) return;
+
+  // Pause and clear any previous file video
+  video.pause();
+  video.removeAttribute("src");
+
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
   canvas.height = 720;
@@ -914,43 +944,121 @@ function startDemoCanvasVideo() {
 
   if (canvas.captureStream) {
     const stream = canvas.captureStream(30);
-    elements.cinemaVideo.srcObject = stream;
-    elements.cinemaVideo.play().catch(() => {});
+    video.srcObject = stream;
+    video.play().catch(() => {});
     elements.videoFilename.textContent = "វីដេអូ៖ Animated Cinema Canvas Simulator";
   }
 }
 
 function handleVideoUpload(file) {
   const video = elements.cinemaVideo;
-  elements.videoFilename.textContent = `វីដេអូ៖ ${file.name}`;
-  video.src = URL.createObjectURL(file);
-  video.load();
-  video.play().catch(() => {});
+  if (!video) return;
 
-  // If user hasn't loaded subtitles yet, automatically offer sample action cues with Khmer translation
-  if (state.subtitles.length === 0 || !state.subtitles.some(s => s.translated)) {
-    elements.rawSubInput.value = SAMPLES.action;
-    parseInputToSubtitles();
-    const sampleTranslations = [
-      "មេបញ្ជាការ យើងបានបាត់ទំនាក់ទំនងជាមួយវិស័យទី ៧។",
-      "តើអ្នកចង់បានន័យថាបាត់ទំនាក់ទំនងយ៉ាងណា? ពិនិត្យរ៉ាដាបម្រុងទុក!",
-      "ក្រឡាចត្រង្គបរិវេណទាំងមូលទើបតែងងឹត។ អ្វីមួយកំពុងមក។",
-      "ស្តាប់ខ្ញុំដោយយកចិត្តទុកដាក់។ នាំជនស៊ីវិលទាំងអស់ទៅកាន់លេណដ្ឋានក្រោមដីឥឡូវនេះ!",
-      "លោកម្ចាស់បានរំលោភទ្វារការពារខាងក្រៅ!",
-      "ចាក់សោហើយផ្ទុក! ថ្ងៃនេះយើងកាន់បន្ទាត់នេះមិនថាមានអ្វីកើតឡើងទេ!"
-    ];
-    state.subtitles.forEach((s, idx) => {
-      if (sampleTranslations[idx]) s.translated = sampleTranslations[idx];
-    });
-    renderSubtitlesList();
+  // 1. CRITICAL: Stop canvas demo and release srcObject so the uploaded movie displays!
+  if (state.demoCanvasInterval) {
+    clearInterval(state.demoCanvasInterval);
+    state.demoCanvasInterval = null;
+  }
+  video.pause();
+  video.srcObject = null; // Important: Must be null to allow video.src to display!
+  video.removeAttribute("src");
+
+  // 2. Set actual video file URL and show in display
+  const videoUrl = URL.createObjectURL(file);
+  video.src = videoUrl;
+  elements.videoFilename.textContent = `វីដេអូ៖ ${file.name}`;
+  video.load();
+  video.play().catch(e => console.log("Video loaded. Press play to start", e));
+
+  // 3. Handle subtitles for this video
+  if (state.subtitles.length > 0 && state.subtitles.some(s => s.translated)) {
+    // Already translated subtitles exist
+    elements.videoHelperBanner?.classList.add("hidden");
     updateTimelineView();
     preloadSubtitleAudio();
+  } else if (state.subtitles.length > 0) {
+    // Subtitles exist but not yet translated
+    elements.videoHelperBanner?.classList.add("hidden");
+    translateVideoSubtitles();
   } else {
-    preloadSubtitleAudio();
+    // No subtitles yet -> Show helper banner offering 1-click sample or SRT input
+    elements.videoHelperBanner?.classList.remove("hidden");
   }
 
-  // Switch to video tab so they immediately see the player
+  // Ensure Video tab is active so the movie is in display
   document.getElementById("tab-btn-video")?.click();
+}
+
+function handleSubtitleUpload(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    elements.rawSubInput.value = e.target.result;
+    parseInputToSubtitles();
+    elements.videoHelperBanner?.classList.add("hidden");
+    // Automatically translate the uploaded subtitles to Khmer!
+    await translateVideoSubtitles();
+  };
+  reader.readAsText(file);
+}
+
+async function translateVideoSubtitles() {
+  if (state.subtitles.length === 0) {
+    // If no subtitles, offer to load action movie sample
+    elements.rawSubInput.value = SAMPLES.action;
+    parseInputToSubtitles();
+  }
+
+  const total = state.subtitles.length;
+  if (total === 0) return;
+
+  state.isTranslating = true;
+  if (elements.videoTranslationProgress) elements.videoTranslationProgress.classList.remove("hidden");
+  if (elements.btnVideoTranslateNow) elements.btnVideoTranslateNow.disabled = true;
+
+  const style = elements.selectStyle ? elements.selectStyle.value : "cinematic";
+  const srcLang = elements.selectSourceLang ? elements.selectSourceLang.value : "auto";
+
+  for (let i = 0; i < total; i++) {
+    const cue = state.subtitles[i];
+    if (elements.videoProgressText) {
+      elements.videoProgressText.textContent = `កំពុងបកប្រែបន្ទាត់ទី ${i + 1} នៃ ${total}...`;
+    }
+    const percent = Math.round(((i + 1) / total) * 100);
+    if (elements.videoProgressBar) elements.videoProgressBar.style.width = `${percent}%`;
+    if (elements.videoProgressPercentage) elements.videoProgressPercentage.textContent = `${percent}%`;
+
+    let trans = "";
+    if (state.aiProvider === "gemini" && state.geminiApiKey) {
+      trans = await translateWithGemini(cue.original, style);
+    } else {
+      trans = await translateWithFreeGoogle(cue.original, srcLang);
+    }
+
+    cue.translated = applyGlossaryAndStyling(trans, style);
+
+    if (i % 2 === 0 || i === total - 1) {
+      renderSubtitlesList();
+      updateTimelineView();
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  state.isTranslating = false;
+  if (elements.btnVideoTranslateNow) elements.btnVideoTranslateNow.disabled = false;
+  if (elements.videoProgressText) elements.videoProgressText.textContent = "បកប្រែបានជោគជ័យ ១០០%!";
+  setTimeout(() => {
+    elements.videoTranslationProgress?.classList.add("hidden");
+  }, 2000);
+
+  renderSubtitlesList();
+  updateTimelineView();
+  preloadSubtitleAudio();
+
+  // If video is paused, play it with subtitles
+  const video = elements.cinemaVideo;
+  if (video && video.paused) {
+    video.play().catch(() => {});
+  }
 }
 
 function syncSubtitleWithVideo(currentTime) {
