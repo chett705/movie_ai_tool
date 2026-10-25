@@ -344,6 +344,11 @@
                 <span class="slider"></span>
                 <span class="toggle-label text-cyan"><i class="fa-solid fa-microphone-lines"></i> និយាយខ្មែរ (AI Dubbing)</span>
               </label>
+              <label class="toggle-switch" title="បិទសំឡេងវីដេអូដើមទាំងស្រុង (Disable Real Sound - ស្តាប់តែសំឡេងនិយាយខ្មែរ AI)">
+                <input type="checkbox" id="toggle-disable-real-sound" checked>
+                <span class="slider"></span>
+                <span class="toggle-label text-gold"><i class="fa-solid fa-volume-xmark"></i> បិទសំឡេងដើម (Disable Real Sound)</span>
+              </label>
               <label class="toggle-switch" title="បង្ហាញ Subtitle ទាំងពីរភាសា">
                 <input type="checkbox" id="toggle-bilingual-preview" checked>
                 <span class="slider"></span>
@@ -621,6 +626,13 @@
                 <p style="margin: 6px 0 0; color: var(--text-secondary); font-size: 0.85rem;">
                   បង្កប់អក្សររត់ខ្មែរម៉ូតស្អាត (Khmer UI គ្មានបាត់ជើង) + លាយបញ្ចូលសំឡេងអត្ថាធិប្បាយខ្មែរ AI តាមពេលវេលាជាក់ស្តែង!
                 </p>
+                <div style="margin-top: 10px; display: inline-block;">
+                  <label class="toggle-switch" style="font-size: 0.82rem;" title="បិទសំឡេងវីដេអូដើមទាំងស្រុងពេល Export (មានតែសំឡេងនិយាយខ្មែរ AI)">
+                    <input type="checkbox" id="toggle-export-disable-real-sound" checked>
+                    <span class="slider"></span>
+                    <span class="toggle-label text-gold"><i class="fa-solid fa-volume-xmark"></i> បិទសំឡេងដើម (Disable Real Sound - សំឡេងខ្មែរសុទ្ធ)</span>
+                  </label>
+                </div>
               </div>
               <button id="btn-do-export-burnin-dubbed" class="btn-primary-glow" style="white-space: nowrap; background: linear-gradient(135deg, #f59e0b, #d97706);">
                 <i class="fa-solid fa-cloud-arrow-down"></i> ទាញយក MP4 ពេញលេញ

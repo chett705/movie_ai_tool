@@ -91,11 +91,11 @@ def split_segment_sentences(segment):
 
     return lines if lines else [(segment.start, segment.end, segment.text.strip())]
 
-def transcribe_and_translate_video(video_path: str, style="cinematic", model_size="tiny", language=None):
+def transcribe_and_translate_video(video_path: str, style="cinematic", model_size="base", language=None):
     """
     1. Extracts audio track from video.
-    2. Transcribes spoken dialogues with timestamps using faster-whisper.
-    3. Translates spoken dialogues to authentic Khmer movie character dialogue.
+    2. Transcribes spoken dialogues with timestamps using faster-whisper (high-sensitivity VAD).
+    3. Translates spoken dialogues to authentic Khmer movie character dialogue without dropping lines.
     """
     import os
 
@@ -106,41 +106,95 @@ def transcribe_and_translate_video(video_path: str, style="cinematic", model_siz
     threads = min(os.cpu_count() or 4, 8)
     model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=threads)
     transcribe_args = {
-        "beam_size": 1,  # Fast greedy search
+        "beam_size": 3,
+        "best_of": 3,
         "vad_filter": True,
-        "word_timestamps": False,  # Fast segment-level transcription for full movies
-        "vad_parameters": {"min_silence_duration_ms": 300}
+        "vad_parameters": dict(min_silence_duration_ms=450, speech_pad_ms=250),
+        "condition_on_previous_text": False,
+        "word_timestamps": True,
+        "no_speech_threshold": 0.65,
+        "compression_ratio_threshold": 2.4,
+        "temperature": [0.0, 0.2]
     }
-    if language:
+    if language and language.lower() != "auto":
         transcribe_args["language"] = language
 
     segments, info = model.transcribe(audio, **transcribe_args)
     detected_lang = getattr(info, "language", language or "auto")
 
     translator = MovieAiTranslator(style=style)
-    raw_cues = []
 
+    raw_cues = []
     for seg in segments:
         text = seg.text.strip()
         if not text:
             continue
 
-        start_time = round(seg.start, 2)
-        end_time = round(seg.end, 2)
-        if end_time - start_time < 1.0:
-            end_time = round(start_time + 1.2, 2)
+        # Filter out pure music note symbols (e.g. ♪♪♪, [Music])
+        if re.match(r'^[♪\s\[\]\(\)\.\,\-\_]+$', text) or text.lower() in ["[music]", "(music)", "music"]:
+            continue
 
-        timecode = f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
-        raw_cues.append({
-            "startTime": start_time,
-            "endTime": end_time,
-            "timecode": timecode,
-            "original": text
-        })
+        # Filter out obvious non-speech noise
+        if getattr(seg, "no_speech_prob", 0) > 0.85:
+            continue
+
+        words = getattr(seg, "words", None)
+        if words and len(words) > 0:
+            cur_words = []
+            for i, w in enumerate(words):
+                cur_words.append(w)
+                w_txt = w.word.strip()
+                gap = False
+                if i < len(words) - 1:
+                    gap = (words[i+1].start - w.end) >= 0.70
+                dur_so_far = w.end - cur_words[0].start
+                is_punct = any(w_txt.endswith(p) for p in ('.', '!', '?', '。', '！', '？'))
+                is_comma = any(w_txt.endswith(p) for p in (',', '，')) and dur_so_far >= 2.0
+                if is_punct or is_comma or gap or dur_so_far >= 4.5:
+                    s = round(cur_words[0].start, 2)
+                    e = round(max(cur_words[-1].end + 0.25, s + 1.2), 2)
+                    t = " ".join([item.word.strip() for item in cur_words if item.word.strip()]).strip()
+                    if re.search(r'[\u4e00-\u9fff\u3040-\u30ff]', t):
+                        t = re.sub(r'(?<=[\u4e00-\u9fff\u3040-\u30ff])\s+(?=[\u4e00-\u9fff\u3040-\u30ff])', '', t)
+                    if t:
+                        timecode = f"{format_timestamp(s)} --> {format_timestamp(e)}"
+                        raw_cues.append({
+                            "startTime": s,
+                            "endTime": e,
+                            "timecode": timecode,
+                            "original": t
+                        })
+                    cur_words = []
+            if cur_words:
+                s = round(cur_words[0].start, 2)
+                e = round(max(cur_words[-1].end + 0.25, s + 1.2), 2)
+                t = " ".join([item.word.strip() for item in cur_words if item.word.strip()]).strip()
+                if re.search(r'[\u4e00-\u9fff\u3040-\u30ff]', t):
+                    t = re.sub(r'(?<=[\u4e00-\u9fff\u3040-\u30ff])\s+(?=[\u4e00-\u9fff\u3040-\u30ff])', '', t)
+                if t:
+                    timecode = f"{format_timestamp(s)} --> {format_timestamp(e)}"
+                    raw_cues.append({
+                        "startTime": s,
+                        "endTime": e,
+                        "timecode": timecode,
+                        "original": t
+                    })
+        else:
+            s = round(seg.start, 2)
+            e = round(max(seg.end, s + 1.2), 2)
+            timecode = f"{format_timestamp(s)} --> {format_timestamp(e)}"
+            raw_cues.append({
+                "startTime": s,
+                "endTime": e,
+                "timecode": timecode,
+                "original": text
+            })
 
     # High-speed batch translation to authentic cinematic Khmer
+    # Always use source_lang="auto" unless explicit language was provided
+    sl = language if (language and language.lower() != "auto") else "auto"
     orig_texts = [cue["original"] for cue in raw_cues]
-    khmer_translations = translator.translate_batch(orig_texts, source_lang=detected_lang, target_lang="km")
+    khmer_translations = translator.translate_batch(orig_texts, source_lang=sl, target_lang="km")
 
     subtitles = []
     for idx, (cue, khmer) in enumerate(zip(raw_cues, khmer_translations), 1):
@@ -179,7 +233,7 @@ def main():
     parser.add_argument("--style", default="cinematic", choices=["cinematic", "action", "horror", "drama", "royal"])
     parser.add_argument("--bilingual", action="store_true", help="Output both Khmer and Original English in subtitles")
     parser.add_argument("--json", action="store_true", help="Print structured JSON result to stdout")
-    parser.add_argument("--model", default="tiny", help="Whisper model (tiny, base, small)")
+    parser.add_argument("--model", default="base", help="Whisper model (tiny, base, small)")
     parser.add_argument("--lang", default=None, help="Spoken language in video (en, zh, th, ja, etc. default: auto)")
 
     args = parser.parse_args()

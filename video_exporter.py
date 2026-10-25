@@ -240,7 +240,7 @@ def build_dubbing_audio_track(cues, total_duration, output_wav_path, voice="pise
 
     return output_wav_path
 
-def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice="piseth", ducking=0.20):
+def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice="piseth", ducking=0.20, disable_real_sound=False):
     """
     Main export function:
     mode:
@@ -248,6 +248,9 @@ def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice=
       - 'burnin': Khmer ASS subtitles burned into pixels, original video audio.
       - 'dubbed_only': Khmer neural voice dubbing mixed into audio, original video pixels.
       - 'softsub': Fast 1s stream copy embedding subtitle track.
+    disable_real_sound:
+      - If True or ducking <= 0.001, completely eliminates original video sound (actor voices),
+        leaving only crystal-clear Khmer dubbing audio.
     """
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
@@ -267,6 +270,7 @@ def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice=
 
     # Escape path for FFmpeg filter
     escaped_ass = temp_ass.replace("\\", "/").replace(":", "\\:")
+    is_mute_real = bool(disable_real_sound or (ducking <= 0.001))
 
     try:
         if mode == "softsub":
@@ -291,25 +295,43 @@ def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice=
             temp_wav = os.path.join(out_dir, f"temp_dub_{os.getpid()}.wav")
             try:
                 build_dubbing_audio_track(cues, duration, temp_wav, voice=voice)
-                filter_complex = (
-                    f"[0:a]volume={ducking:.2f}[orig]; "
-                    f"[orig][1:a]amix=inputs=2:duration=first:normalize=0[aout]; "
-                    f"[0:v]ass=filename='{escaped_ass}'[vout]"
-                )
-                cmd = [
-                    ffmpeg_exe, "-y",
-                    "-i", video_path,
-                    "-i", temp_wav,
-                    "-filter_complex", filter_complex,
-                    "-map", "[vout]",
-                    "-map", "[aout]",
-                    "-c:v", "libx264",
-                    "-preset", "veryfast",
-                    "-crf", "22",
-                    "-c:a", "aac",
-                    "-b:a", "192k",
-                    output_path
-                ]
+                filter_complex = f"[0:v]ass=filename='{escaped_ass}'[vout]"
+                
+                if is_mute_real:
+                    # Pure Khmer dubbing without original movie audio
+                    cmd = [
+                        ffmpeg_exe, "-y",
+                        "-i", video_path,
+                        "-i", temp_wav,
+                        "-filter_complex", filter_complex,
+                        "-map", "[vout]",
+                        "-map", "1:a",
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-crf", "22",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        output_path
+                    ]
+                else:
+                    filter_complex += (
+                        f"; [0:a]volume={ducking:.2f}[orig]; "
+                        f"[orig][1:a]amix=inputs=2:duration=first:normalize=0[aout]"
+                    )
+                    cmd = [
+                        ffmpeg_exe, "-y",
+                        "-i", video_path,
+                        "-i", temp_wav,
+                        "-filter_complex", filter_complex,
+                        "-map", "[vout]",
+                        "-map", "[aout]",
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-crf", "22",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        output_path
+                    ]
                 proc = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
                 if proc.returncode != 0:
                     raise RuntimeError("FFmpeg export error:\n" + proc.stderr[-800:])
@@ -322,22 +344,35 @@ def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice=
             temp_wav = os.path.join(out_dir, f"temp_dub_{os.getpid()}.wav")
             try:
                 build_dubbing_audio_track(cues, duration, temp_wav, voice=voice)
-                filter_complex = (
-                    f"[0:a]volume={ducking:.2f}[orig]; "
-                    f"[orig][1:a]amix=inputs=2:duration=first:normalize=0[aout]"
-                )
-                cmd = [
-                    ffmpeg_exe, "-y",
-                    "-i", video_path,
-                    "-i", temp_wav,
-                    "-filter_complex", filter_complex,
-                    "-map", "0:v",
-                    "-map", "[aout]",
-                    "-c:v", "copy",
-                    "-c:a", "aac",
-                    "-b:a", "192k",
-                    output_path
-                ]
+                if is_mute_real:
+                    cmd = [
+                        ffmpeg_exe, "-y",
+                        "-i", video_path,
+                        "-i", temp_wav,
+                        "-map", "0:v",
+                        "-map", "1:a",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        output_path
+                    ]
+                else:
+                    filter_complex = (
+                        f"[0:a]volume={ducking:.2f}[orig]; "
+                        f"[orig][1:a]amix=inputs=2:duration=first:normalize=0[aout]"
+                    )
+                    cmd = [
+                        ffmpeg_exe, "-y",
+                        "-i", video_path,
+                        "-i", temp_wav,
+                        "-filter_complex", filter_complex,
+                        "-map", "0:v",
+                        "-map", "[aout]",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        output_path
+                    ]
                 proc = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
                 if proc.returncode != 0:
                     raise RuntimeError("FFmpeg dubbed export error:\n" + proc.stderr[-800:])
@@ -346,17 +381,21 @@ def export_video(video_path, srt_path, output_path, mode="burnin_dubbed", voice=
                     os.unlink(temp_wav)
 
         else:
-            # Burn-in Subtitles Only (preserving original audio)
+            # Burn-in Subtitles Only
             cmd = [
                 ffmpeg_exe, "-y",
                 "-i", video_path,
                 "-vf", f"ass=filename='{escaped_ass}'",
                 "-c:v", "libx264",
                 "-preset", "veryfast",
-                "-crf", "22",
-                "-c:a", "copy",
-                output_path
+                "-crf", "22"
             ]
+            if is_mute_real:
+                cmd.append("-an")
+            else:
+                cmd.extend(["-c:a", "copy"])
+            cmd.append(output_path)
+
             proc = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
             if proc.returncode != 0:
                 raise RuntimeError("FFmpeg burnin export error:\n" + proc.stderr[-800:])
@@ -377,18 +416,20 @@ def main():
                         help="Export mode (default: burnin_dubbed)")
     parser.add_argument("--voice", default="piseth", choices=["piseth", "sreymom"], help="Voice for dubbing")
     parser.add_argument("--ducking", default=0.20, type=float, help="Original video volume level during speech (default: 0.20)")
+    parser.add_argument("--disable-real-sound", action="store_true", help="Disable original video audio completely (pure Khmer dubbing only)")
 
     args = parser.parse_args()
 
     try:
-        print(f"[*] Exporting movie (mode: {args.mode}, voice: {args.voice})...")
+        print(f"[*] Exporting movie (mode: {args.mode}, voice: {args.voice}, disable_real_sound: {args.disable_real_sound})...")
         out = export_video(
             video_path=args.video,
             srt_path=args.srt,
             output_path=args.output,
             mode=args.mode,
             voice=args.voice,
-            ducking=args.ducking
+            ducking=args.ducking,
+            disable_real_sound=args.disable_real_sound
         )
         size_mb = os.path.getsize(out) / (1024 * 1024)
         print(f"[✔] Successfully exported video ({size_mb:.2f} MB): {out}")

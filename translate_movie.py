@@ -42,6 +42,12 @@ DEFAULT_GLOSSARY = {
     r"\block and load\b": "ត្រៀមអាវុធប្រយុទ្ធ",
     r"\bfire in the hole\b": "ប្រយ័ត្នគ្រាប់បែក",
     r"\bhold the line\b": "ទប់ជំហរឲ្យជាប់",
+    r"\bmount\b": "សត្វជំនិះ",
+    r"\bsteed\b": "សត្វជំនិះ",
+    r"\bvassal\b": "ចំណុះ",
+    r"\bjackpot\b": "ត្រូវប៉ាន់",
+    r"\bcalamity\b": "គ្រោះមហន្តរាយ",
+    r"\bgranduncle\b": "លោកតាពូ",
 }
 
 class MovieAiTranslator:
@@ -81,8 +87,13 @@ class MovieAiTranslator:
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
-                    translated = data[0][0]
+                translated = ""
+                if isinstance(data, list) and len(data) > 0:
+                    if isinstance(data[0], str):
+                        translated = data[0]
+                    elif isinstance(data[0], list) and len(data[0]) > 0 and isinstance(data[0][0], str):
+                        translated = data[0][0]
+                if translated:
                     return self._polish_khmer_movie_style(translated, orig_text=text, style=self.style)
         except Exception:
             pass
@@ -96,8 +107,9 @@ class MovieAiTranslator:
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                translated = "".join([segment[0] for segment in data[0] if segment[0]])
-                return self._polish_khmer_movie_style(translated, orig_text=text, style=self.style)
+                translated = "".join([segment[0] for segment in data[0] if segment and len(segment) > 0 and segment[0]])
+                if translated:
+                    return self._polish_khmer_movie_style(translated, orig_text=text, style=self.style)
         except Exception as e:
             print(f"[Warning] Translation error on '{text}': {e}", file=sys.stderr)
             return text
@@ -122,26 +134,36 @@ class MovieAiTranslator:
                 )
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
-                        raw_trans = data[0][0]
+                    raw_trans = ""
+                    if isinstance(data, list) and len(data) > 0:
+                        if isinstance(data[0], str):
+                            raw_trans = data[0]
+                        elif isinstance(data[0], list) and len(data[0]) > 0 and isinstance(data[0][0], str):
+                            raw_trans = data[0][0]
+                    if raw_trans:
                         translated_lines = raw_trans.split("\n")
             except Exception as e:
                 print(f"[Batch translation error]: {e}", file=sys.stderr)
                 translated_lines = [self.translate_text(t, source_lang, target_lang) for t in chunk]
 
             # Ensure 1:1 line alignment
-            while len(translated_lines) < len(chunk):
-                idx = len(translated_lines)
-                translated_lines.append(self.translate_text(chunk[idx], source_lang, target_lang))
+            if len(translated_lines) != len(chunk):
+                # If Google joined or split lines, translate each line individually to guarantee 100% accurate alignment
+                translated_lines = [self.translate_text(t, source_lang="auto", target_lang=target_lang) for t in chunk]
 
-            for orig, trans in zip(chunk, translated_lines[:len(chunk)]):
+            for orig, trans in zip(chunk, translated_lines):
                 if not orig.strip():
                     results.append("")
                 else:
-                    results.append(self._polish_khmer_movie_style(trans, orig_text=orig, style=self.style))
+                    # If translation failed and returned original non-Khmer text, retry with auto
+                    if trans.strip() == orig.strip() and not re.search(r'[\u1780-\u17FF]', trans):
+                        retry_trans = self.translate_text(orig, source_lang="auto", target_lang=target_lang)
+                        results.append(self._polish_khmer_movie_style(retry_trans, orig_text=orig, style=self.style))
+                    else:
+                        results.append(self._polish_khmer_movie_style(trans, orig_text=orig, style=self.style))
 
             if i + batch_size < len(texts):
-                time.sleep(0.1)
+                time.sleep(0.08)
 
         return results
 
@@ -218,10 +240,10 @@ class MovieAiTranslator:
         if "time didn't change anything" in clean_orig and "never left" in clean_orig:
             return "ពេលវេលាមិនអាចផ្លាស់ប្តូរចិត្តខ្ញុំបានទេ... ក្នុងបេះដូងខ្ញុំ បងមិនដែលចាកចេញទៅណាឡើយ..."
 
-        # Chinese / Wuxia / Xianxia movie tropes
+        # Chinese / Wuxia / Xianxia / Fantasy movie tropes
         if "不可思议" in orig_text or "incredible magic" in clean_orig:
-            return "វេទមន្តមិនគួរឱ្យជឿ!"
-        if "何人敢" in orig_text or "who dares disturb" in clean_orig:
+            return "មហិទ្ធិឫទ្ធិមិនគួរឱ្យជឿ!"
+        if "何人敢" in orig_text or "who dares disturb" in clean_orig or ("disturb" in clean_orig and "sleep" in clean_orig):
             return "នរណាហ៊ានរំខានដំណេករបស់លោកម្ចាស់?!"
         if "找死" in orig_text or "court death" in clean_orig:
             return "ឯងចង់ងាប់ហើយមែនទេ?!"
@@ -231,8 +253,38 @@ class MovieAiTranslator:
             return "ដល់ពេលឯងត្រូវស្លាប់ហើយ!"
         if "放肆" in orig_text or "insolent" in clean_orig:
             return "ឈ្លើយណាស់! ហ៊ានមិនក្រាបសំពះលោកម្ចាស់ផង?!"
+        if "calamity" in clean_orig and ("blood plane" in clean_orig or "come early" in clean_orig):
+            return "ដែនឈាមបានទម្លុះរបាំងចេញមកហើយ គ្រោះមហន្តរាយលើកទីបួនរបស់ឯងមកដល់ពិតមែន!"
+        if "mount" in clean_orig and ("become" in clean_orig or "be my" in clean_orig or "you will" in clean_orig):
+            return "ឯងនឹងក្លាយជាសត្វជំនិះរបស់ខ្ញុំ!"
+        if "first time" in clean_orig and "mount" in clean_orig:
+            return "នេះជាលើកដំបូងដែលខ្ញុំធ្វើជាសត្វជំនិះ..."
+        if "eat him" in clean_orig and "stronger" in clean_orig:
+            return "បើខ្ញុំលេបត្របាក់វា ខ្ញុំនឹងកាន់តែខ្លាំងក្លាឡើង!"
+        if ("don't care who he is" in clean_orig or "do not care who he is" in clean_orig) and "food" in clean_orig:
+            return "ខ្ញុំមិនខ្វល់ថាវាជានរណាទេ ថ្ងៃនេះវាត្រូវតែក្លាយជាចំណីរបស់ខ្ញុំ!"
+        if "vassal" in clean_orig and ("loomian" in clean_orig or "family" in clean_orig):
+            return "គ្រួសារ Loomian ដ៏អស្ចារ្យ មិនព្រមចុះចូលធ្វើជាចំណុះរបស់អ្នកណាជាដាច់ខាត!"
 
         # Common action & Hollywood one-liners
+        if re.search(r"\b(good heavens|heavens|good lord|my goodness)\b", clean_orig):
+            return "ឱព្រះអើយ!"
+        if re.search(r"\b(go to hell|to hell with you)\b", clean_orig):
+            return "ទៅងាប់ទៅ! ចុះនរកទៅ!"
+        if re.search(r"\b(whoa,? jackpot|jackpot)\b", clean_orig):
+            return "យីអើ! ត្រូវប៉ាន់ហើយ!"
+        if re.search(r"\b(calm down little one)\b", clean_orig):
+            return "ចិត្តត្រជាក់ៗកូនតូច! កុំស្លន់ស្លោអី!"
+        if re.search(r"\b(calm down|take it easy)\b", clean_orig):
+            return "ចិត្តត្រជាក់ៗសិនទៅ!"
+        if re.search(r"\b(holy shit|holy crap|holy cow)\b", clean_orig):
+            return "យីអើ! ងាប់ហើយលោកអើយ!"
+        if re.search(r"\b(damn it|dammit|goddammit)\b", clean_orig):
+            return "ចង្រៃយក៍!"
+        if re.search(r"\b(what the hell|what the f(uck)?)\b", clean_orig):
+            return "ស្អីគេហ្នឹង?!"
+        if re.search(r"\b(son of a bitch)\b", clean_orig):
+            return "អាតិរច្ឆាន!"
         if re.search(r"\b(fire in the hole)\b", clean_orig):
             return "ប្រយ័ត្នគ្រាប់បែក! ក្រាបចុះ!"
         if re.search(r"\b(cover me)\b", clean_orig):
@@ -243,14 +295,14 @@ class MovieAiTranslator:
             return "ក្រាបចុះ!"
         if re.search(r"\b(drop your weapon|drop the gun)\b", clean_orig):
             return "ទម្លាក់អាវុធចុះភ្លាម!"
-        if re.search(r"\b(don't move)\b", clean_orig):
+        if re.search(r"\b(don't move|freeze)\b", clean_orig):
             return "នៅឲ្យស្ងៀម កុំកម្រើក!"
-        if re.search(r"\b(are you crazy|are you out of your mind)\b", clean_orig):
+        if re.search(r"\b(are you crazy|are you out of your mind|are you kidding me)\b", clean_orig):
             return "ឯងឆ្កួតហើយមែនទេ?!"
         if re.search(r"\b(we're running out of time|no time left)\b", clean_orig):
             return "យើងអស់ពេលហើយ! ឆាប់ឡើង!"
-        if re.search(r"\b(shut up)\b", clean_orig):
-            return "បិទមាត់ទៅ!"
+        if re.search(r"\b(shut up)\b", clean_orig) or re.search(r"^(silence!?|quiet!?)$", clean_orig):
+            return "បិទមាត់ទៅ! នៅឲ្យស្ងៀម!"
         if re.search(r"\b(trust me)\b", clean_orig):
             return "ជឿជាក់លើខ្ញុំទៅ!"
         if re.search(r"\b(who are you)\b", clean_orig):
@@ -261,8 +313,45 @@ class MovieAiTranslator:
             return "មានរឿងអីកើតឡើង?!"
         if re.search(r"\b(no way|impossible)\b", clean_orig):
             return "មិនអាចទៅរួចទេ! គ្មានផ្លូវទេ!"
+        if re.search(r"\b(get out of here|get lost)\b", clean_orig):
+            return "ឆាប់ចេញពីទីនេះភ្លាម!"
+        if re.search(r"\b(i don't care|i do not care|i don't give a damn)\b", clean_orig):
+            return "ខ្ញុំមិនខ្វល់ទេ!"
+        if re.search(r"\b(i'm warning you|i am warning you)\b", clean_orig):
+            return "ខ្ញុំព្រមានឯងណា!"
+        if re.search(r"\b(stay with me)\b", clean_orig):
+            return "តាំងស្មារតីឡើង កុំទាន់បិទភ្នែក!"
 
         # 2. General dialogue idiom cleanup (Fix awkward machine translation)
+        # Fix Google Translate weird literal errors
+        text = text.replace("ឋានសួគ៌ល្អ", "ឱព្រះអើយ!")
+        text = text.replace("ស្ងប់អារម្មណ៍តូចមួយ", "ចិត្តត្រជាក់ៗកូនតូច")
+        text = text.replace("ស្ងប់អារម្មណ៍ចុះ", "ចិត្តត្រជាក់ៗសិន!")
+        text = text.replace("ទៅនរក", "ទៅងាប់ទៅ!")
+        text = text.replace("រង្វាន់ជេកផត", "ត្រូវប៉ាន់ហើយ!")
+        text = text.replace("កូនឆ្កេញី", "អាតិរច្ឆាន!")
+        text = text.replace("លាមកបរិសុទ្ធ", "ងាប់ហើយលោកអើយ!")
+        text = text.replace("ខូចវា", "ចង្រៃយក៍!")
+        text = text.replace("តើអ្វីទៅជានរក", "រឿងឆ្កួតស្អីហ្នឹង?!")
+        text = text.replace("ភាពស្ងប់ស្ងាត់", "នៅស្ងៀមភ្លាម!")
+        text = text.replace("ភ្នំរបស់ខ្ញុំ", "សត្វជំនិះរបស់ខ្ញុំ")
+        if "mount" in clean_orig or "riding" in clean_orig:
+            text = text.replace("ឡើងភ្នំ", "ជិះសត្វជំនិះ")
+        if "shatter" in clean_orig or "broken" in clean_orig or "sword" in clean_orig:
+            text = text.replace("ញាប់ញ័រ", "បាក់បែកខ្ទេចខ្ទី")
+        text = text.replace("ពូដ៏អស្ចារ្យ", "លោកតាពូ")
+        text = text.replace("ដាក់កំហុសគាត់សម្រាប់", "ច្រឡំគាត់ជា")
+        text = text.replace("កុំពិបាកជាមួយកូន", "កុំតឹងរ៉ឹងដាក់ក្មេងអី")
+        text = text.replace("នោះជាស្រីល្អ", "ក្មេងល្អណាស់")
+        text = text.replace("គ្រួសារទឹកដោះគោ", "គ្រួសារ Loomian")
+        text = text.replace("ខ្ញុំមិនស្លាប់ដូចការផ្ដន្ទាទោសពីឥឡូវនេះទេ", "ខ្ញុំមិនអាចមកស្លាប់នៅទីនេះបានទេ!")
+        text = text.replace("ឲ្យអាហារបន្ថែមដល់អ្នកខ្ញុំត្រូវខ្ទេចខ្ទីស្លាប់", "បើផ្តល់ថាមពលឲ្យឯងទៀត ខ្ញុំប្រាកដជាត្រូវស្លាប់មិនខាន!")
+        text = text.replace("គ្រួសារ Loomian ដ៏អស្ចារ្យ នឹងមិនក្លាយជាអ្នកធំរបស់នរណាម្នាក់ឡើយ", "គ្រួសារ Loomian ដ៏អស្ចារ្យ មិនព្រមចុះចូលធ្វើជាចំណុះរបស់អ្នកណាជាដាច់ខាត!")
+        text = text.replace("Vassal", "ចំណុះ").replace("vassal", "ចំណុះ")
+        text = text.replace("កុំព្យាយាមអ្វីទាំងអស់", "កុំធ្វើអ្វីផ្តេសផ្តាសឲ្យសោះ!")
+        text = text.replace("បណ្តាសារបស់យាយនឹងកាន់តែរឹងមាំ", "បណ្តាសានឹងកាន់តែសាហាវឡើង!")
+        text = text.replace("ហេតុអ្វីបានជាមានអារម្មណ៍ថាត្រជាក់ឆ្អឹងមួយរំពេចនោះ?", "ហេតុអីបានជាស្រៀវឆ្អឹងខ្នងភ្លាមៗបែបនេះ?!")
+
         # Fix breach -> rape
         text = re.sub(r"រំលោភ[\s\u200B]*(ទ្វារ|កំពែង|របាំង|បន្ទាយ|ប្រព័ន្ធ|ច្រក|ទីតាំង|ព្រំដែន)", r"ទម្លុះ\1", text)
         text = text.replace("រំលោភទ្វារ", "ទម្លុះទ្វារ")
@@ -292,7 +381,7 @@ class MovieAiTranslator:
             text = text.replace("ព្រះអម្ចាស់", "លោកមេបញ្ជាការ")
         elif "លោកម្ចាស់" in text and style != "royal":
             # In martial arts/wuxia, keep លោកម្ចាស់ / ចៅហ្វាយ, in modern movies replace with លោកមេ
-            if not ("វេទមន្ត" in text or "បិសាច" in text or "វិជ្ជា" in text):
+            if not ("វេទមន្ត" in text or "បិសាច" in text or "វិជ្ជា" in text or "មហិទ្ធិឫទ្ធិ" in text or "ជំនិះ" in text):
                 text = text.replace("លោកម្ចាស់", "លោកមេ")
 
         # Conversational flow fixes (clean up robotic 'ពួកយើងបាន' -> 'យើង')
